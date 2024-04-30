@@ -51,13 +51,32 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	answerer := generation.NewAnswerer(s.openAIClient)
 
 	prompt := fmt.Sprintf("concisely answer this question: <question>%s</question>", query)
-	text, err := answerer.Generate(ctx, prompt, documents)
-	if err != nil {
-		render.Render(w, r, InternalServerError(errors.New(fmt.Sprintf("Error generating answer: %v", err))))
-		return
+	responseChan := make(chan string, 1)
+	shouldStream := true
+	go func() {
+		if err := answerer.Generate(ctx, prompt, documents, responseChan, shouldStream); err != nil {
+			render.Render(w, r, InternalServerError(errors.New(fmt.Sprintf("Error generating answer: %v", err))))
+			return
+		}
+	}()
+
+	if !shouldStream {
+		text := <-responseChan
+		render.JSON(w, r, SearchResponse{text})
 	}
 
-	render.JSON(w, r, SearchResponse{text})
+	stream := NewStream(w)
+	// TODO: make sure errors are handled properly after this line
+	if err = stream.Establish(); err != nil {
+		render.Render(w, r, InternalServerError(errors.New(fmt.Sprintf("Error establishing stream: %v", err))))
+	}
+
+	// Send events to the client
+	for completionText := range responseChan {
+		if err := stream.Write(completionText); err != nil {
+			fmt.Printf("error occuring writing to stream: %v\n", err)
+		}
+	}
 }
 
 func toRetrievers(corpora []string, retrieversByCorpus map[string]retrieval.Retriever) ([]retrieval.Retriever, render.Renderer) {
