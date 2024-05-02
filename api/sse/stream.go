@@ -1,6 +1,7 @@
-package api
+package sse
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -26,18 +27,32 @@ func (s *Stream) Establish() error {
 		return fmt.Errorf("streaming unsupported")
 	}
 	f.Flush()
+
 	s.flusher = f
-	println("attaching flushed", s.flusher)
+
 	return nil
 }
 
-func (s *Stream) Write(data interface{}) error {
-	if _, err := fmt.Fprintf(s.w, "data: %s\n\n", data); err != nil {
+func (s *Stream) Write(e Event) error {
+	marshalled, err := json.Marshal(e.Data)
+	if err != nil {
+		return fmt.Errorf("error marshalling event data: %v", err)
+	}
+
+	if _, err := fmt.Fprintf(s.w, "event: %s\ndata: %s\n\n", e.EventType, marshalled); err != nil {
 		return fmt.Errorf("error writing to streaming: %v", err)
 	}
-	if s.flusher == nil {
-		println("flushing is nil")
-	}
+
 	s.flusher.Flush()
 	return nil
+}
+
+func (s *Stream) Error(clientErrorMessage string) {
+	fmt.Fprintf(s.w, "event: error\ndata: %s\n\n", clientErrorMessage)
+	s.flusher.Flush()
+}
+
+type Event struct {
+	EventType string
+	Data      interface{}
 }

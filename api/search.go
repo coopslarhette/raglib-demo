@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/render"
 	"golang.org/x/sync/errgroup"
 	"net/http"
+	"raglib/api/sse"
 	"raglib/internal/document"
 	"raglib/internal/generation"
 	"raglib/internal/retrieval"
@@ -36,7 +37,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		"web":      retrieval.NewSERPRetriever(s.serpAPIClient),
 	}
 
-	retrievers, errRenderer := toRetrievers(corpora, retrieversByCorpus)
+	retrievers, errRenderer := corporaToRetrievers(corpora, retrieversByCorpus)
 	if errRenderer != nil {
 		render.Render(w, r, errRenderer)
 		return
@@ -53,6 +54,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	prompt := fmt.Sprintf("concisely answer this question: <question>%s</question>", query)
 	responseChan := make(chan string, 1)
 	shouldStream := true
+
 	go func() {
 		if err := answerer.Generate(ctx, prompt, documents, responseChan, shouldStream); err != nil {
 			render.Render(w, r, InternalServerError(errors.New(fmt.Sprintf("Error generating answer: %v", err))))
@@ -65,23 +67,28 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		render.JSON(w, r, SearchResponse{text})
 	}
 
-	stream := NewStream(w)
+	stream := sse.NewStream(w)
 	// TODO: make sure errors are handled properly after this line
 	if err = stream.Establish(); err != nil {
 		render.Render(w, r, InternalServerError(errors.New(fmt.Sprintf("Error establishing stream: %v", err))))
 	}
 
+	documentsReference := sse.Event{EventType: "documentsreference", Data: documents}
+	if err := stream.Write(documentsReference); err != nil {
+		stream.Error("Error writing to stream.")
+	}
+
 	// Send events to the client
 	for completionText := range responseChan {
-		if err := stream.Write(completionText); err != nil {
-			fmt.Printf("error occuring writing to stream: %v\n", err)
+		if err := stream.Write(sse.Event{EventType: "completion", Data: completionText}); err != nil {
+			stream.Error("Error writing to stream.")
 		}
 	}
 }
 
-func toRetrievers(corpora []string, retrieversByCorpus map[string]retrieval.Retriever) ([]retrieval.Retriever, render.Renderer) {
-	retrievers := make([]retrieval.Retriever, len(corpora))
-	for i, c := range corpora {
+func corporaToRetrievers(corporaSelection []string, retrieversByCorpus map[string]retrieval.Retriever) ([]retrieval.Retriever, render.Renderer) {
+	retrievers := make([]retrieval.Retriever, len(corporaSelection))
+	for i, c := range corporaSelection {
 		retriever, ok := retrieversByCorpus[c]
 		if !ok {
 			return nil, ErrorMalformedRequest(errors.New(fmt.Sprintf("Corpus, %v, is invalid", c)))
