@@ -11,6 +11,7 @@ import (
 	"raglib/internal/document"
 	"raglib/internal/generation"
 	"raglib/internal/retrieval"
+	"strings"
 )
 
 type SearchResponse struct {
@@ -67,8 +68,10 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		render.JSON(w, r, SearchResponse{text})
 	}
 
+	bufferedChunkChan := make(chan string, 1)
+	go processAndBufferChunks(responseChan, bufferedChunkChan)
+
 	stream := sse.NewStream(w)
-	// TODO: make sure errors are handled properly after this line
 	if err = stream.Establish(); err != nil {
 		render.Render(w, r, InternalServerError(errors.New(fmt.Sprintf("Error establishing stream: %v", err))))
 	}
@@ -79,11 +82,52 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send events to the client
-	for completionText := range responseChan {
+	for completionText := range bufferedChunkChan {
 		if err := stream.Write(sse.Event{EventType: "completion", Data: completionText}); err != nil {
 			stream.Error("Error writing to stream.")
 		}
 	}
+
+	if err = stream.Write(sse.Event{EventType: "done", Data: "DONE"}); err != nil {
+		stream.Error("Error writing to stream.")
+	}
+}
+
+func processAndBufferChunks(responseChan <-chan string, bufferedChunkChan chan<- string) {
+	var buffer strings.Builder
+	var isCitation bool
+
+	for chunk := range responseChan {
+		for _, char := range chunk {
+			if char == '<' {
+				if isCitation {
+					buffer.WriteRune(char)
+				} else {
+					if buffer.Len() > 0 {
+						bufferedChunkChan <- buffer.String()
+						buffer.Reset()
+					}
+					buffer.WriteRune(char)
+					isCitation = true
+				}
+			} else if char == '>' {
+				buffer.WriteRune(char)
+				if isCitation && strings.HasSuffix(buffer.String(), "</cited>") {
+					bufferedChunkChan <- buffer.String()
+					buffer.Reset()
+					isCitation = false
+				}
+			} else {
+				buffer.WriteRune(char)
+			}
+		}
+	}
+
+	if buffer.Len() > 0 {
+		bufferedChunkChan <- buffer.String()
+	}
+
+	close(bufferedChunkChan)
 }
 
 func corporaToRetrievers(corporaSelection []string, retrieversByCorpus map[string]retrieval.Retriever) ([]retrieval.Retriever, render.Renderer) {
