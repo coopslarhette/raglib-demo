@@ -1,0 +1,10 @@
+.root {
+    display: flex;
+    align-self: center;
+    align-items: center;
+    flex-direction: column;
+    width: 1100px;
+    height: 100%;
+    padding: 70px 0;
+    gap: 32px;
+}

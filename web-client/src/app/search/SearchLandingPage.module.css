@@ -1,0 +1,38 @@
+.searchBar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.searchInput {
+    width: 100%;
+    max-width: 600px;
+    padding: 10px;
+    border-radius: 20px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+    outline: none;
+}
+
+.searchButton {
+    padding: 10px 20px;
+    border-radius: 20px;
+    border: none;
+    background-color: #007bff;
+    color: #fff;
+    font-size: 16px;
+    margin-left: 10px;
+    cursor: pointer;
+
+    &:hover {
+        background-color: #1971ce;
+    }
+}
+
+.sourceContainer {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* 3 equal columns */
+    grid-auto-rows: auto; /* auto height for rows */
+    gap: 12px; /* adjust the gap between grid items */
+}

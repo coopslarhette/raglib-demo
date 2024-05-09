@@ -11,11 +11,22 @@ import (
 	"raglib/internal/document"
 	"raglib/internal/generation"
 	"raglib/internal/retrieval"
+	"strconv"
 	"strings"
 )
 
 type SearchResponse struct {
 	Answer string `json:"answer"`
+}
+
+type TextChunk struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
+type CitationChunk struct {
+	Type  string `json:"type"`
+	Value int    `json:"value"`
 }
 
 func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +79,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		render.JSON(w, r, SearchResponse{text})
 	}
 
-	bufferedChunkChan := make(chan string, 1)
+	bufferedChunkChan := make(chan sse.Event, 1)
 	go processAndBufferChunks(responseChan, bufferedChunkChan)
 
 	stream := sse.NewStream(w)
@@ -82,8 +93,8 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send events to the client
-	for completionText := range bufferedChunkChan {
-		if err := stream.Write(sse.Event{EventType: "completion", Data: completionText}); err != nil {
+	for chunk := range bufferedChunkChan {
+		if err := stream.Write(chunk); err != nil {
 			stream.Error("Error writing to stream.")
 		}
 	}
@@ -92,39 +103,57 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		stream.Error("Error writing to stream.")
 	}
 }
-
-func processAndBufferChunks(responseChan <-chan string, bufferedChunkChan chan<- string) {
-	var buffer strings.Builder
+func processAndBufferChunks(responseChan <-chan string, bufferedChunkChan chan<- sse.Event) {
+	var citationBuffer strings.Builder
 	var isCitation bool
 
 	for chunk := range responseChan {
+		var textBuffer strings.Builder
 		for _, char := range chunk {
 			if char == '<' {
 				if isCitation {
-					buffer.WriteRune(char)
+					citationBuffer.WriteRune(char)
 				} else {
-					if buffer.Len() > 0 {
-						bufferedChunkChan <- buffer.String()
-						buffer.Reset()
+					if textBuffer.Len() > 0 {
+						bufferedChunkChan <- sse.NewTextEvent(textBuffer.String())
+						textBuffer.Reset()
 					}
-					buffer.WriteRune(char)
+					citationBuffer.WriteRune(char)
 					isCitation = true
 				}
 			} else if char == '>' {
-				buffer.WriteRune(char)
-				if isCitation && strings.HasSuffix(buffer.String(), "</cited>") {
-					bufferedChunkChan <- buffer.String()
-					buffer.Reset()
-					isCitation = false
+				if isCitation {
+					citationBuffer.WriteRune(char)
+					if strings.HasSuffix(citationBuffer.String(), "</cited>") {
+						citationStr := strings.TrimSuffix(citationBuffer.String(), "</cited>")
+						citationStr = strings.TrimPrefix(citationStr, "<cited>")
+						citationNumber, err := strconv.Atoi(citationStr)
+						if err != nil {
+							bufferedChunkChan <- sse.NewTextEvent(fmt.Sprintf("Error parsing citation number: %v", err))
+						} else {
+							bufferedChunkChan <- sse.NewCitationEvent(citationNumber)
+						}
+						citationBuffer.Reset()
+						isCitation = false
+					}
+				} else {
+					textBuffer.WriteRune(char)
 				}
 			} else {
-				buffer.WriteRune(char)
+				if isCitation {
+					citationBuffer.WriteRune(char)
+				} else {
+					textBuffer.WriteRune(char)
+				}
 			}
+		}
+		if textBuffer.Len() > 0 {
+			bufferedChunkChan <- sse.NewTextEvent(textBuffer.String())
 		}
 	}
 
-	if buffer.Len() > 0 {
-		bufferedChunkChan <- buffer.String()
+	if citationBuffer.Len() > 0 {
+		bufferedChunkChan <- sse.NewTextEvent(citationBuffer.String())
 	}
 
 	close(bufferedChunkChan)

@@ -56,3 +56,11 @@ type Event struct {
 	EventType string
 	Data      interface{}
 }
+
+func NewTextEvent(text string) Event {
+	return Event{EventType: "text", Data: text}
+}
+
+func NewCitationEvent(citationNumber int) Event {
+	return Event{EventType: "citation", Data: citationNumber}
+}
