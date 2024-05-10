@@ -73,7 +73,7 @@ export default function SearchLandingPage() {
     }
 
     return (
-        <div>
+        <div className={styles.searchRoot}>
             <div className={styles.searchBar}>
                 <input
                     placeholder="Search..."
@@ -87,7 +87,7 @@ export default function SearchLandingPage() {
                 </Button>
             </div>
             {documents.length > 0 && (
-                <div>
+                <div className={styles.resultSection}>
                     <h2>Sources</h2>
                     <div className={styles.sourceContainer}>
                         {documents.map((document, index) => {
@@ -97,8 +97,8 @@ export default function SearchLandingPage() {
                 </div>
             )}
             {answerChunks.length > 0 && (
-                <div>
-                    <h2>Results:</h2>
+                <div className={styles.resultSection}>
+                    <h2>Results</h2>
                     <div>
                         {answerChunks.map((ac) => {
                             return ac.type === 'text' ? (

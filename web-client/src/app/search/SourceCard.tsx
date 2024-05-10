@@ -23,7 +23,7 @@ export function SourceCard({
 
     return (
         <Card>
-            <CardActionArea onClick={handleClick}>
+            <CardActionArea onClick={handleClick} className={styles.card}>
                 {thumbnail && (
                     <CardMedia
                         component="img"
@@ -32,7 +32,7 @@ export function SourceCard({
                         alt="Thumbnail"
                     />
                 )}
-                <CardContent>
+                <CardContent className={styles.cardContent}>
                     <div className={styles.header}>
                         {favicon && (
                             <img
@@ -41,12 +41,16 @@ export function SourceCard({
                                 className={styles.favicon}
                             />
                         )}
-                        <Typography variant="h6" component="div">
-                            {title}
+                        <Typography
+                            className={styles.displayedLink}
+                            variant="body2"
+                            color="text.secondary"
+                        >
+                            {displayedLink}
                         </Typography>
                     </div>
-                    <Typography variant="body2" color="text.secondary">
-                        {displayedLink}
+                    <Typography variant="subtitle1" component="div">
+                        {title}
                     </Typography>
                     <div className={styles.metadata}>
                         {author && (
@@ -55,9 +59,7 @@ export function SourceCard({
                             </Typography>
                         )}
                         {date && (
-                            <Typography variant="body2">
-                                Date: {date}
-                            </Typography>
+                            <Typography variant="body2">{date}</Typography>
                         )}
                     </div>
                 </CardContent>
