@@ -11,5 +11,5 @@
 }
 
 .citation:hover {
-    background-color: #d59494;
+    background-color: var(--brand-pink-hover);
 }
