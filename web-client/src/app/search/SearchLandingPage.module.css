@@ -25,8 +25,8 @@
     padding: 10px 20px;
     border-radius: 20px;
     border: none;
-    background-color: #007bff;
-    color: #fff;
+    background-color: var(--brand-pink);
+    color: var(--graphite-text);
     font-size: 16px;
     margin-left: 10px;
     cursor: pointer;
