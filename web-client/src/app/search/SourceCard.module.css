@@ -9,6 +9,10 @@
     width: 100%;
 }
 
+.hoveredViaCitation span {
+    opacity: 0.08;
+}
+
 .header {
     display: flex;
     align-items: center;

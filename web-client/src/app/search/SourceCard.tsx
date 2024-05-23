@@ -9,13 +9,16 @@ import {
     Typography,
 } from '@mui/material'
 import { WebReference } from '@/app/search/types'
+import clsx from 'clsx'
 
 type SourceCardProps = {
     source: WebReference
+    isHoveredViaCitation: boolean
 }
 
 export function SourceCard({
     source: { title, link, displayedLink, date, author, favicon, thumbnail },
+    isHoveredViaCitation,
 }: SourceCardProps) {
     const handleClick = () => {
         window.open(link, '_blank', 'noopener noreferrer')
@@ -23,7 +26,12 @@ export function SourceCard({
 
     return (
         <Card>
-            <CardActionArea onClick={handleClick} className={styles.card}>
+            <CardActionArea
+                onClick={handleClick}
+                className={clsx(styles.card, {
+                    [styles.hoveredViaCitation]: isHoveredViaCitation,
+                })}
+            >
                 {thumbnail && (
                     <CardMedia
                         component="img"

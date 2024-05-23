@@ -5,6 +5,8 @@ import { Button } from '@mui/base'
 import { SourceDocument } from '@/app/search/types'
 import { CitationBubble } from '@/app/search/CitationBubble'
 import { SourceCard } from '@/app/search/SourceCard'
+import { setHttpClientAndAgentOptions } from 'next/dist/server/setup-http-agent-env'
+import { number } from 'prop-types'
 
 type TextChunk = {
     type: 'text'
@@ -22,6 +24,9 @@ export default function SearchLandingPage() {
     const [query, setQuery] = useState('')
     const [documents, setDocuments] = useState<SourceDocument[]>([])
     const [answerChunks, setAnswerChunks] = useState<AnswerChunk[]>([])
+    const [hoveredCitationIndex, setHoveredCitationIndex] = useState<
+        null | number
+    >(null)
 
     const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         setQuery(event.target.value)
@@ -72,6 +77,12 @@ export default function SearchLandingPage() {
         }
     }
 
+    const handleCitationClick = (citationIndex: number) => {
+        const link = documents[citationIndex]?.webReference?.link
+        if (!link) return
+        window.open(link, '_blank', 'noopener noreferrer')
+    }
+
     return (
         <div className={styles.searchRoot}>
             <div className={styles.searchBar}>
@@ -91,7 +102,14 @@ export default function SearchLandingPage() {
                     <h2>Sources</h2>
                     <div className={styles.sourceContainer}>
                         {documents.map((document, index) => {
-                            return <SourceCard source={document.webReference!} />
+                            return (
+                                <SourceCard
+                                    source={document.webReference!}
+                                    isHoveredViaCitation={
+                                        hoveredCitationIndex === index
+                                    }
+                                />
+                            )
                         })}
                     </div>
                 </div>
@@ -104,7 +122,16 @@ export default function SearchLandingPage() {
                             return ac.type === 'text' ? (
                                 <span>{ac.value}</span>
                             ) : (
-                                <CitationBubble label={ac.value + 1} />
+                                <CitationBubble
+                                    onClick={() => handleCitationClick(ac.value)}
+                                    label={ac.value + 1}
+                                    onMouseEnter={() =>
+                                        setHoveredCitationIndex(ac.value)
+                                    }
+                                    onMouseLeave={() =>
+                                        setHoveredCitationIndex(null)
+                                    }
+                                />
                             )
                         })}
                     </div>
