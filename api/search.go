@@ -129,7 +129,7 @@ func processAndBufferChunks(responseChan <-chan string, bufferedChunkChan chan<-
 						citationStr = strings.TrimPrefix(citationStr, "<cited>")
 						citationNumber, err := strconv.Atoi(citationStr)
 						if err != nil {
-							bufferedChunkChan <- sse.NewTextEvent(fmt.Sprintf("Error parsing citation number: %v", err))
+							bufferedChunkChan <- sse.NewErrorEvent(fmt.Sprintf("Error parsing citation number: %v", err))
 						} else {
 							bufferedChunkChan <- sse.NewCitationEvent(citationNumber)
 						}

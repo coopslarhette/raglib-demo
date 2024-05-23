@@ -64,3 +64,7 @@ func NewTextEvent(text string) Event {
 func NewCitationEvent(citationNumber int) Event {
 	return Event{EventType: "citation", Data: citationNumber}
 }
+
+func NewErrorEvent(errorMessage string) Event {
+	return Event{EventType: "error", Data: errorMessage}
+}
