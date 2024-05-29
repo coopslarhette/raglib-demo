@@ -1,6 +1,7 @@
 package api
 
 import (
+	"raglib/api/sse"
 	"testing"
 )
 
@@ -8,39 +9,60 @@ func TestProcessAndBufferChunks(t *testing.T) {
 	testCases := []struct {
 		name           string
 		inputChunks    []string
-		expectedOutput []string
+		expectedOutput []sse.Event
 	}{
 		{
-			name:           "Citation in the middle",
-			inputChunks:    []string{"This is a sample text with a citation <cited>1</cited> in the middle."},
-			expectedOutput: []string{"This is a sample text with a citation ", "<cited>1</cited>", " in the middle."},
+			name:        "Citation in the middle",
+			inputChunks: []string{"This is a sample text with a citation <cited>1</cited> in the middle."},
+			expectedOutput: []sse.Event{
+				sse.NewTextEvent("This is a sample text with a citation "),
+				sse.NewCitationEvent(1),
+				sse.NewTextEvent(" in the middle."),
+			},
 		},
 		{
-			name:           "Multiple citations",
-			inputChunks:    []string{"Another example with multiple citations <cited>2</cited> and <cited>3</cited>."},
-			expectedOutput: []string{"Another example with multiple citations ", "<cited>2</cited>", " and ", "<cited>3</cited>", "."},
+			name:        "Multiple citations",
+			inputChunks: []string{"Another example with multiple citations <cited>2</cited> and <cited>3</cited>."},
+			expectedOutput: []sse.Event{
+				sse.NewTextEvent("Another example with multiple citations "),
+				sse.NewCitationEvent(2),
+				sse.NewTextEvent(" and "),
+				sse.NewCitationEvent(3),
+				sse.NewTextEvent("."),
+			},
 		},
 		{
-			name:           "Partial citation spanning multiple chunks",
-			inputChunks:    []string{"An edge case with a partial citation <ci", "ted>4</cited> that spans multiple chunks."},
-			expectedOutput: []string{"An edge case with a partial citation ", "<cited>4</cited>", " that spans multiple chunks."},
+			name:        "Partial citation spanning multiple chunks",
+			inputChunks: []string{"An edge case with a partial citation <ci", "ted>4</cited> that spans multiple chunks."},
+			expectedOutput: []sse.Event{
+				sse.NewTextEvent("An edge case with a partial citation "),
+				sse.NewCitationEvent(4),
+				sse.NewTextEvent(" that spans multiple chunks."),
+			},
 		},
 		{
-			name:           "Citation at the end of a chunk",
-			inputChunks:    []string{"A case with a citation at the end of a chunk <cited>5</cited>", " and some text after it."},
-			expectedOutput: []string{"A case with a citation at the end of a chunk ", "<cited>5</cited>", " and some text after it."},
+			name:        "Citation at the end of a chunk",
+			inputChunks: []string{"A case with a citation at the end of a chunk <cited>5</cited>", " and some text after it."},
+			expectedOutput: []sse.Event{
+				sse.NewTextEvent("A case with a citation at the end of a chunk "),
+				sse.NewCitationEvent(5),
+				sse.NewTextEvent(" and some text after it."),
+			},
 		},
 		{
-			name:           "Incomplete citation at the end",
-			inputChunks:    []string{"A case with an incomplete citation at the end <cit"},
-			expectedOutput: []string{"A case with an incomplete citation at the end ", "<cit"},
+			name:        "Incomplete citation at the end",
+			inputChunks: []string{"A case with an incomplete citation at the end <cit"},
+			expectedOutput: []sse.Event{
+				sse.NewTextEvent("A case with an incomplete citation at the end "),
+				sse.NewTextEvent("<cit"),
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			responseChan := make(chan string)
-			bufferedChunkChan := make(chan string)
+			bufferedChunkChan := make(chan sse.Event)
 
 			go func() {
 				for _, chunk := range tc.inputChunks {
@@ -49,20 +71,21 @@ func TestProcessAndBufferChunks(t *testing.T) {
 				close(responseChan)
 			}()
 
-			go processAndBufferChunks(responseChan, bufferedChunkChan)
+			p := ChunkProcessor{}
+			go p.ProcessChunks(responseChan, bufferedChunkChan)
 
-			var outputChunks []string
-			for chunk := range bufferedChunkChan {
-				outputChunks = append(outputChunks, chunk)
+			var outputEvents []sse.Event
+			for event := range bufferedChunkChan {
+				outputEvents = append(outputEvents, event)
 			}
 
-			if len(outputChunks) != len(tc.expectedOutput) {
-				t.Fatalf("Unexpected number of output chunks. Got: %d, Expected: %d", len(outputChunks), len(tc.expectedOutput))
+			if len(outputEvents) != len(tc.expectedOutput) {
+				t.Fatalf("Unexpected number of output events. Got: %d, Expected: %d", len(outputEvents), len(tc.expectedOutput))
 			}
 
-			for i, chunk := range outputChunks {
-				if chunk != tc.expectedOutput[i] {
-					t.Errorf("Unexpected output chunk. Got: %q, Expected: %q", chunk, tc.expectedOutput[i])
+			for i, event := range outputEvents {
+				if event.EventType != tc.expectedOutput[i].EventType || event.Data != tc.expectedOutput[i].Data {
+					t.Errorf("Unexpected output event. Got: %+v, Expected: %+v", event, tc.expectedOutput[i])
 				}
 			}
 		})

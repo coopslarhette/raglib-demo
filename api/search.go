@@ -11,8 +11,6 @@ import (
 	"raglib/internal/document"
 	"raglib/internal/generation"
 	"raglib/internal/retrieval"
-	"strconv"
-	"strings"
 )
 
 type SearchResponse struct {
@@ -80,7 +78,8 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bufferedChunkChan := make(chan sse.Event, 1)
-	go processAndBufferChunks(responseChan, bufferedChunkChan)
+	cp := ChunkProcessor{}
+	go cp.ProcessChunks(responseChan, bufferedChunkChan)
 
 	stream := sse.NewStream(w)
 	if err = stream.Establish(); err != nil {
@@ -102,63 +101,6 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	if err = stream.Write(sse.Event{EventType: "done", Data: "DONE"}); err != nil {
 		stream.Error("Error writing to stream.")
 	}
-}
-
-func processAndBufferChunks(responseChan <-chan string, bufferedChunkChan chan<- sse.Event) {
-	var citationBuffer strings.Builder
-	var isCitation bool
-	const (
-		citationPrefixMarker  = "<cited>"
-		citationPostfixMarker = "</cited>"
-	)
-
-	for chunk := range responseChan {
-		var textBuffer strings.Builder
-		for _, char := range chunk {
-			if isCitation {
-				citationBuffer.WriteRune(char)
-				if strings.HasSuffix(citationBuffer.String(), citationPostfixMarker) {
-					citationStr := strings.TrimSuffix(citationBuffer.String(), citationPostfixMarker)
-					citationStr = strings.TrimPrefix(citationStr, citationPrefixMarker)
-					citationStr = strings.TrimSpace(citationStr)
-					if citationNumber, err := strconv.Atoi(citationStr); err != nil {
-						fmt.Printf("Invalid citation number text in between citation marker XML tags: %s\n", citationStr)
-						bufferedChunkChan <- sse.NewTextEvent(citationBuffer.String())
-					} else {
-						bufferedChunkChan <- sse.NewCitationEvent(citationNumber)
-					}
-					citationBuffer.Reset()
-					isCitation = false
-				} else if !(strings.HasPrefix(citationPrefixMarker, citationBuffer.String()) || strings.HasPrefix(citationBuffer.String(), citationPrefixMarker)) {
-					// First case checks before the first <cited> tag has been formed, second case checks after the <cited> tag has been formed
-					// Flush out the citation buffer if the pattern is broken
-					textBuffer.Write([]byte(citationBuffer.String()))
-					citationBuffer.Reset()
-					isCitation = false
-				}
-			} else {
-				if char == '<' {
-					if textBuffer.Len() > 0 {
-						bufferedChunkChan <- sse.NewTextEvent(textBuffer.String())
-						textBuffer.Reset()
-					}
-					citationBuffer.WriteRune(char)
-					isCitation = true
-				} else {
-					textBuffer.WriteRune(char)
-				}
-			}
-		}
-		if textBuffer.Len() > 0 {
-			bufferedChunkChan <- sse.NewTextEvent(textBuffer.String())
-		}
-	}
-
-	if citationBuffer.Len() > 0 {
-		bufferedChunkChan <- sse.NewTextEvent(citationBuffer.String())
-	}
-
-	close(bufferedChunkChan)
 }
 
 func corporaToRetrievers(corporaSelection []string, retrieversByCorpus map[string]retrieval.Retriever) ([]retrieval.Retriever, render.Renderer) {

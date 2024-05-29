@@ -7,9 +7,20 @@ import { CitationBubble } from '@/app/search/CitationBubble'
 import { SourceCard } from '@/app/search/SourceCard'
 import { setHttpClientAndAgentOptions } from 'next/dist/server/setup-http-agent-env'
 import { number } from 'prop-types'
+import { Card, CardContent } from '@mui/material'
+import CodeBlock from '@/app/CodeBlock'
+
+type BaseChunk = {
+    ID: string
+}
 
 type TextChunk = {
     type: 'text'
+    value: string
+}
+
+type CodeBlockChunk = {
+    type: 'codeblock'
     value: string
 }
 
@@ -18,7 +29,7 @@ type CitationChunk = {
     value: number
 }
 
-type AnswerChunk = TextChunk | CitationChunk
+type AnswerChunk = BaseChunk & (TextChunk | CitationChunk | CodeBlockChunk)
 
 export default function SearchLandingPage() {
     const [query, setQuery] = useState('')
@@ -50,7 +61,10 @@ export default function SearchLandingPage() {
         eventSource.addEventListener('text', (event) => {
             const data = JSON.parse(event.data)
 
-            setAnswerChunks((prev) => [...prev, { type: 'text', value: data }])
+            setAnswerChunks((prev) => [
+                ...prev,
+                { type: 'text', value: data, ID: data.ID },
+            ])
         })
 
         eventSource.addEventListener('citation', (event) => {
@@ -58,13 +72,21 @@ export default function SearchLandingPage() {
 
             setAnswerChunks((prev) => [
                 ...prev,
-                { type: 'citation', value: data },
+                { type: 'citation', value: data, ID: data.ID },
             ])
         })
 
         eventSource.addEventListener('documentsreference', (event) => {
             const data = JSON.parse(event.data)
             setDocuments(data)
+        })
+
+        eventSource.addEventListener('codeblock', (event) => {
+            const data = JSON.parse(event.data)
+            setAnswerChunks((prev) => [
+                ...prev,
+                { type: 'codeblock', value: data, ID: data.ID },
+            ])
         })
 
         eventSource.addEventListener('done', (event) => {
@@ -77,17 +99,11 @@ export default function SearchLandingPage() {
         }
     }
 
-    const handleCitationClick = (citationIndex: number) => {
-        const link = documents[citationIndex]?.webReference?.link
-        if (!link) return
-        window.open(link, '_blank', 'noopener noreferrer')
-    }
-
     return (
         <div className={styles.searchRoot}>
             <div className={styles.searchBar}>
                 <input
-                    placeholder="Search..."
+                    placeholder="Why are peppers spicy?"
                     value={query}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyPress}
@@ -108,6 +124,7 @@ export default function SearchLandingPage() {
                                     isHoveredViaCitation={
                                         hoveredCitationIndex === index
                                     }
+                                    key={document.webReference?.link}
                                 />
                             )
                         })}
@@ -117,26 +134,61 @@ export default function SearchLandingPage() {
             {answerChunks.length > 0 && (
                 <div className={styles.resultSection}>
                     <h2>Results</h2>
-                    <div>
-                        {answerChunks.map((ac) => {
-                            return ac.type === 'text' ? (
-                                <span>{ac.value}</span>
-                            ) : (
-                                <CitationBubble
-                                    onClick={() => handleCitationClick(ac.value)}
-                                    label={ac.value + 1}
-                                    onMouseEnter={() =>
-                                        setHoveredCitationIndex(ac.value)
+                    <Card className={styles.answerCard}>
+                        <CardContent className={styles.cardContent}>
+                            {answerChunks.map((ac) => (
+                                <AnswerChunk
+                                    ac={ac}
+                                    key={ac.ID}
+                                    setHoveredCitationIndex={
+                                        setHoveredCitationIndex
                                     }
-                                    onMouseLeave={() =>
-                                        setHoveredCitationIndex(null)
-                                    }
+                                    documents={documents}
                                 />
-                            )
-                        })}
-                    </div>
+                            ))}
+                        </CardContent>
+                    </Card>
                 </div>
             )}
         </div>
     )
+}
+
+interface AnswerChunkProps {
+    ac: AnswerChunk
+    documents: SourceDocument[]
+    setHoveredCitationIndex: React.Dispatch<React.SetStateAction<number | null>>
+}
+
+function AnswerChunk({
+    ac,
+    documents,
+    setHoveredCitationIndex,
+}: AnswerChunkProps) {
+    const handleCitationClick = (citationIndex: number) => {
+        const link = documents[citationIndex]?.webReference?.link
+        if (!link) return
+        window.open(link, '_blank', 'noopener noreferrer')
+    }
+
+    switch (ac.type) {
+        case 'text':
+            return <span className={styles.answerText}>{ac.value}</span>
+        case 'citation':
+            return (
+                <CitationBubble
+                    onClick={() => handleCitationClick(ac.value)}
+                    label={ac.value + 1}
+                    onMouseEnter={() => setHoveredCitationIndex(ac.value)}
+                    onMouseLeave={() => setHoveredCitationIndex(null)}
+                />
+            )
+        case 'codeblock':
+            const lines = ac.value.split('\n')
+            const language = lines[0].match(/```(\w+)/)?.[1] || ''
+            const code = lines.slice(1, -1).join('\n')
+            return <CodeBlock language={language} code={code} />
+        default:
+            return <span>Unsupported answer chunk</span>
+    }
 }

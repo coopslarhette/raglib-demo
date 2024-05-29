@@ -25,10 +25,10 @@ export function SourceCard({
     }
 
     return (
-        <Card>
+        <Card className={styles.cardRoot}>
             <CardActionArea
                 onClick={handleClick}
-                className={clsx(styles.card, {
+                className={clsx(styles.cardActionArea, {
                     [styles.hoveredViaCitation]: isHoveredViaCitation,
                 })}
             >

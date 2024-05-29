@@ -3,6 +3,7 @@ package sse
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"net/http"
 )
 
@@ -53,22 +54,23 @@ func (s *Stream) Error(clientErrorMessage string) {
 }
 
 type Event struct {
+	ID        uuid.UUID
 	EventType string
 	Data      interface{}
 }
 
 func NewTextEvent(text string) Event {
-	return Event{EventType: "text", Data: text}
+	return Event{EventType: "text", Data: text, ID: uuid.New()}
 }
 
 func NewCitationEvent(citationNumber int) Event {
-	return Event{EventType: "citation", Data: citationNumber}
+	return Event{EventType: "citation", Data: citationNumber, ID: uuid.New()}
 }
 
 func NewCodeBlockEvent(code string) Event {
-	return Event{EventType: "code", Data: code}
+	return Event{EventType: "codeblock", Data: code, ID: uuid.New()}
 }
 
 func NewErrorEvent(errorMessage string) Event {
-	return Event{EventType: "error", Data: errorMessage}
+	return Event{EventType: "error", Data: errorMessage, ID: uuid.New()}
 }
