@@ -65,6 +65,10 @@ func NewCitationEvent(citationNumber int) Event {
 	return Event{EventType: "citation", Data: citationNumber}
 }
 
+func NewCodeBlockEvent(code string) Event {
+	return Event{EventType: "code", Data: code}
+}
+
 func NewErrorEvent(errorMessage string) Event {
 	return Event{EventType: "error", Data: errorMessage}
 }

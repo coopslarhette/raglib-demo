@@ -103,45 +103,47 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		stream.Error("Error writing to stream.")
 	}
 }
+
 func processAndBufferChunks(responseChan <-chan string, bufferedChunkChan chan<- sse.Event) {
 	var citationBuffer strings.Builder
 	var isCitation bool
+	const (
+		citationPrefixMarker  = "<cited>"
+		citationPostfixMarker = "</cited>"
+	)
 
 	for chunk := range responseChan {
 		var textBuffer strings.Builder
 		for _, char := range chunk {
-			if char == '<' {
-				if isCitation {
-					citationBuffer.WriteRune(char)
-				} else {
+			if isCitation {
+				citationBuffer.WriteRune(char)
+				if strings.HasSuffix(citationBuffer.String(), citationPostfixMarker) {
+					citationStr := strings.TrimSuffix(citationBuffer.String(), citationPostfixMarker)
+					citationStr = strings.TrimPrefix(citationStr, citationPrefixMarker)
+					citationStr = strings.TrimSpace(citationStr)
+					if citationNumber, err := strconv.Atoi(citationStr); err != nil {
+						fmt.Printf("Invalid citation number text in between citation marker XML tags: %s\n", citationStr)
+						bufferedChunkChan <- sse.NewTextEvent(citationBuffer.String())
+					} else {
+						bufferedChunkChan <- sse.NewCitationEvent(citationNumber)
+					}
+					citationBuffer.Reset()
+					isCitation = false
+				} else if !(strings.HasPrefix(citationPrefixMarker, citationBuffer.String()) || strings.HasPrefix(citationBuffer.String(), citationPrefixMarker)) {
+					// First case checks before the first <cited> tag has been formed, second case checks after the <cited> tag has been formed
+					// Flush out the citation buffer if the pattern is broken
+					textBuffer.Write([]byte(citationBuffer.String()))
+					citationBuffer.Reset()
+					isCitation = false
+				}
+			} else {
+				if char == '<' {
 					if textBuffer.Len() > 0 {
 						bufferedChunkChan <- sse.NewTextEvent(textBuffer.String())
 						textBuffer.Reset()
 					}
 					citationBuffer.WriteRune(char)
 					isCitation = true
-				}
-			} else if char == '>' {
-				if isCitation {
-					citationBuffer.WriteRune(char)
-					if strings.HasSuffix(citationBuffer.String(), "</cited>") {
-						citationStr := strings.TrimSuffix(citationBuffer.String(), "</cited>")
-						citationStr = strings.TrimPrefix(citationStr, "<cited>")
-						citationNumber, err := strconv.Atoi(citationStr)
-						if err != nil {
-							bufferedChunkChan <- sse.NewErrorEvent(fmt.Sprintf("Error parsing citation number: %v", err))
-						} else {
-							bufferedChunkChan <- sse.NewCitationEvent(citationNumber)
-						}
-						citationBuffer.Reset()
-						isCitation = false
-					}
-				} else {
-					textBuffer.WriteRune(char)
-				}
-			} else {
-				if isCitation {
-					citationBuffer.WriteRune(char)
 				} else {
 					textBuffer.WriteRune(char)
 				}
