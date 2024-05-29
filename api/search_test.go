@@ -57,6 +57,42 @@ func TestProcessAndBufferChunks(t *testing.T) {
 				sse.NewTextEvent("<cit"),
 			},
 		},
+		{
+			name:        "Code block",
+			inputChunks: []string{"A code block example:", "```python\n", "print('Hello, World!')\n", "```", "End of code block."},
+			expectedOutput: []sse.Event{
+				sse.NewTextEvent("A code block example:"),
+				sse.NewCodeBlockEvent("```python\nprint('Hello, World!')\n```"),
+				sse.NewTextEvent("End of code block."),
+			},
+		},
+		{
+			name:        "Code block spanning multiple chunks",
+			inputChunks: []string{"Another code block ", "example:", "```java\n", "System.out.println(\"Hello, ", "World!\");\n", "```", "End of code block."},
+			expectedOutput: []sse.Event{
+				sse.NewTextEvent("Another code block "),
+				sse.NewTextEvent("example:"),
+				sse.NewCodeBlockEvent("```java\nSystem.out.println(\"Hello, World!\");\n```"),
+				sse.NewTextEvent("End of code block."),
+			},
+		},
+		{
+			name:        "Code block with citation",
+			inputChunks: []string{"A code block with a citation:", "```javascript\n", "console.log('Citation: <cited>6</cited>');\n", "```", "End of code block."},
+			expectedOutput: []sse.Event{
+				sse.NewTextEvent("A code block with a citation:"),
+				sse.NewCodeBlockEvent("```javascript\nconsole.log('Citation: <cited>6</cited>');\n```"),
+				sse.NewTextEvent("End of code block."),
+			},
+		},
+		{
+			name:        "Incomplete code block at the end",
+			inputChunks: []string{"An incomplete code block at the end:", "```"},
+			expectedOutput: []sse.Event{
+				sse.NewTextEvent("An incomplete code block at the end:"),
+				sse.NewCodeBlockEvent("```"),
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -84,8 +120,11 @@ func TestProcessAndBufferChunks(t *testing.T) {
 			}
 
 			for i, event := range outputEvents {
-				if event.EventType != tc.expectedOutput[i].EventType || event.Data != tc.expectedOutput[i].Data {
-					t.Errorf("Unexpected output event. Got: %+v, Expected: %+v", event, tc.expectedOutput[i])
+				if event.EventType != tc.expectedOutput[i].EventType {
+					t.Errorf("Unexpected output event type. Got: %v, Expected: %v", event.EventType, tc.expectedOutput[i].EventType)
+				}
+				if event.Data != tc.expectedOutput[i].Data {
+					t.Errorf("Unexpected output event data. Got: %+v, Expected: %+v", event.Data, tc.expectedOutput[i].Data)
 				}
 			}
 		})
