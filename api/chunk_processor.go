@@ -80,10 +80,15 @@ func createCitationEvent(citationBuffer strings.Builder) sse.Event {
 }
 
 func (cp *ChunkProcessor) processTextChar(char rune, bufferedChunkChan chan<- sse.Event) {
-	if strings.HasPrefix(cp.textBuffer.String()+string(char), codeBlockMarker) {
-		cp.codeBuffer.WriteString(cp.textBuffer.String())
+	codeBlockStart := strings.Index(cp.textBuffer.String()+string(char), codeBlockMarker)
+	if codeBlockStart != -1 {
+		text := cp.textBuffer.String() + string(char)
 		cp.textBuffer.Reset()
-		cp.codeBuffer.WriteRune(char)
+		// Flush any text before code block that is currently buffered
+		if codeBlockStart > 0 {
+			bufferedChunkChan <- sse.NewTextEvent(text[:codeBlockStart])
+		}
+		cp.codeBuffer.WriteString(text[codeBlockStart:])
 		cp.isCodeBlock = true
 	} else if char == '<' {
 		cp.maybeFlushTextBuffer(bufferedChunkChan)
