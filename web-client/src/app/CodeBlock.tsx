@@ -1,6 +1,5 @@
-import React, { useEffect } from 'react'
-import Prism from 'prismjs'
-import 'prismjs/themes/prism.css' // or any other theme you prefer
+import React, { useEffect, useState } from 'react'
+import { codeToHtml } from 'shiki'
 
 interface CodeBlockProps {
     language: string
@@ -8,13 +7,24 @@ interface CodeBlockProps {
 }
 
 export default function CodeBlock({ language, code }: CodeBlockProps) {
-    useEffect(() => {
-        Prism.highlightAll()
-    }, [])
+    const [highlightedCode, setHighlightedCode] = useState('')
 
-    return (
-        <pre>
-            <code className={`language-${language}`}>{code}</code>
-        </pre>
-    )
+    useEffect(() => {
+        const highlightCode = async () => {
+            try {
+                const highlighted = await codeToHtml(code, {
+                    lang: language,
+                    theme: 'vitesse-dark',
+                })
+
+                setHighlightedCode(highlighted)
+            } catch (error) {
+                console.error(`Language '${language}' not supported by Shiki`)
+            }
+        }
+
+        highlightCode()
+    }, [language, code])
+
+    return <pre dangerouslySetInnerHTML={{ __html: highlightedCode }} />
 }
