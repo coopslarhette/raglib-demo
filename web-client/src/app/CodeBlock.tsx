@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { codeToHtml } from 'shiki'
+import styles from './code-block.module.css'
 
 interface CodeBlockProps {
     language: string
@@ -14,7 +15,7 @@ export default function CodeBlock({ language, code }: CodeBlockProps) {
             try {
                 const highlighted = await codeToHtml(code, {
                     lang: language,
-                    theme: 'vitesse-dark',
+                    theme: 'material-theme',
                 })
 
                 setHighlightedCode(highlighted)
@@ -26,5 +27,5 @@ export default function CodeBlock({ language, code }: CodeBlockProps) {
         highlightCode()
     }, [language, code])
 
-    return <pre dangerouslySetInnerHTML={{ __html: highlightedCode }} />
+    return <div className={styles.code} dangerouslySetInnerHTML={{ __html: highlightedCode }} />
 }

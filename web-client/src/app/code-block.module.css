@@ -1,0 +1,9 @@
+.code {
+    & > pre {
+        font-size: 16px !important;
+        line-height: 1.4 !important;
+        border-radius: 9px !important;
+        padding: 12px 18px !important;
+        margin: 4px 0;
+    }
+}
