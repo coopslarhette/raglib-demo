@@ -8,9 +8,9 @@ import (
 	"golang.org/x/sync/errgroup"
 	"net/http"
 	"raglib/api/sse"
-	"raglib/internal/document"
-	"raglib/internal/generation"
-	"raglib/internal/retrieval"
+	"raglib/lib/document"
+	"raglib/lib/generation"
+	"raglib/lib/retrieval"
 )
 
 type SearchResponse struct {

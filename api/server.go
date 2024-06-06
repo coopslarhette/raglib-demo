@@ -15,7 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"raglib/internal/retrieval"
+	"raglib/lib/retrieval"
 	"syscall"
 )
 
