@@ -14,8 +14,7 @@
     "@mui/material": "^5.15.16",
     "next": "^14.2.3",
     "react": "^18",
-    "react-dom": "^18",
-    "shiki": "^1.6.1"
+    "react-dom": "^18"
   },
   "devDependencies": {
     "@types/node": "^20",
@@ -23,6 +22,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "prettier": "^3.2.5",
+    "shiki": "^1.6.4",
     "typescript": "^5"
   }
 }

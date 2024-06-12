@@ -139,11 +139,11 @@ export default function SearchLandingPage() {
                             {answerChunks.map((ac) => (
                                 <AnswerChunk
                                     ac={ac}
-                                    key={ac.ID}
                                     setHoveredCitationIndex={
                                         setHoveredCitationIndex
                                     }
                                     documents={documents}
+                                    key={ac.ID}
                                 />
                             ))}
                         </CardContent>
