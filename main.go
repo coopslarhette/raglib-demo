@@ -36,7 +36,10 @@ func main() {
 	}
 	defer conn.Close()
 
-	openaiClient := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+	config := openai.DefaultConfig(os.Getenv("OPENAI_API_KEY"))
+	//config.BaseURL = "https://api.together.xyz/v1"
+
+	openaiClient := openai.NewClientWithConfig(config)
 
 	server := api.NewServer(conn, openaiClient)
 
