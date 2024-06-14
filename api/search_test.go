@@ -73,6 +73,24 @@ func TestProcessAndBufferChunks(t *testing.T) {
 			},
 		},
 		{
+			name: "Code block across chunks",
+			inputChunks: []string{
+				"A code block example:",
+				" ``",
+				"`",
+				"python\n",
+				"print('Hello, World!')\n",
+				"```",
+				"End of code block.",
+			},
+			expectedOutput: []sse.Event{
+				sse.NewTextEvent("A code block example:"),
+				sse.NewTextEvent(" "),
+				sse.NewCodeBlockEvent("```python\nprint('Hello, World!')\n```"),
+				sse.NewTextEvent("End of code block."),
+			},
+		},
+		{
 			name:        "Code block spanning multiple chunks",
 			inputChunks: []string{"Another code block ", "example:", "```java\n", "System.out.println(\"Hello, ", "World!\");\n", "```", "End of code block."},
 			expectedOutput: []sse.Event{

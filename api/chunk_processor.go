@@ -33,7 +33,7 @@ func (cp *ChunkProcessor) ProcessChunks(responseChan <-chan string, bufferedChun
 				cp.processTextChar(char, bufferedChunkChan)
 			}
 		}
-		cp.maybeFlushTextBuffer(bufferedChunkChan)
+		cp.maybeFlushTextBufferTo(bufferedChunkChan)
 	}
 
 	if cp.codeBuffer.Len() > 0 {
@@ -47,8 +47,19 @@ func (cp *ChunkProcessor) ProcessChunks(responseChan <-chan string, bufferedChun
 
 func (cp *ChunkProcessor) processCodeBlockChar(char rune, bufferedChunkChan chan<- sse.Event) {
 	cp.codeBuffer.WriteRune(char)
-	if strings.HasSuffix(cp.codeBuffer.String(), codeBlockMarker) {
+	if cp.codeBuffer.Len() < 4 {
+		if char != '`' {
+			cp.textBuffer.Write([]byte(cp.codeBuffer.String()))
+			cp.codeBuffer.Reset()
+			cp.isCodeBlock = false
+		}
+	} else if strings.HasSuffix(cp.codeBuffer.String(), codeBlockMarker) {
+		fmt.Println(cp.codeBuffer.String())
 		bufferedChunkChan <- sse.NewCodeBlockEvent(cp.codeBuffer.String())
+		cp.codeBuffer.Reset()
+		cp.isCodeBlock = false
+	} else if !(strings.HasPrefix(codeBlockMarker, cp.codeBuffer.String()) || strings.HasPrefix(cp.codeBuffer.String(), codeBlockMarker)) {
+		cp.textBuffer.Write([]byte(cp.codeBuffer.String()))
 		cp.codeBuffer.Reset()
 		cp.isCodeBlock = false
 	}
@@ -80,18 +91,21 @@ func createCitationEvent(citationBuffer strings.Builder) sse.Event {
 }
 
 func (cp *ChunkProcessor) processTextChar(char rune, bufferedChunkChan chan<- sse.Event) {
-	codeBlockStart := strings.Index(cp.textBuffer.String()+string(char), codeBlockMarker)
-	if codeBlockStart != -1 {
-		text := cp.textBuffer.String() + string(char)
-		cp.textBuffer.Reset()
-		// Flush any text before code block that is currently buffered
-		if codeBlockStart > 0 {
-			bufferedChunkChan <- sse.NewTextEvent(text[:codeBlockStart])
-		}
-		cp.codeBuffer.WriteString(text[codeBlockStart:])
+	//codeBlockStart := strings.Index(cp.textBuffer.String()+string(char), codeBlockMarker)
+	fmt.Println(cp.textBuffer.String() + string(char))
+	if char == '`' {
+		cp.maybeFlushTextBufferTo(bufferedChunkChan)
+		cp.codeBuffer.WriteRune(char)
+		//text := cp.textBuffer.String() + string(char)
+		//cp.textBuffer.Reset()
+		//// Flush any text before code block that is currently buffered
+		//if codeBlockStart > 0 {
+		//	bufferedChunkChan <- sse.NewTextEvent(text[:codeBlockStart])
+		//}
+		//cp.codeBuffer.WriteString(text[codeBlockStart:])
 		cp.isCodeBlock = true
 	} else if char == '<' {
-		cp.maybeFlushTextBuffer(bufferedChunkChan)
+		cp.maybeFlushTextBufferTo(bufferedChunkChan)
 		cp.citationBuffer.WriteRune(char)
 		cp.isCitation = true
 	} else {
@@ -99,7 +113,7 @@ func (cp *ChunkProcessor) processTextChar(char rune, bufferedChunkChan chan<- ss
 	}
 }
 
-func (cp *ChunkProcessor) maybeFlushTextBuffer(bufferedChunkChan chan<- sse.Event) {
+func (cp *ChunkProcessor) maybeFlushTextBufferTo(bufferedChunkChan chan<- sse.Event) {
 	if cp.textBuffer.Len() > 0 {
 		bufferedChunkChan <- sse.NewTextEvent(cp.textBuffer.String())
 		cp.textBuffer.Reset()
