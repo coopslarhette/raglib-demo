@@ -27,7 +27,7 @@ func main() {
 
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Fatalf("errror loading .env file: %v", err)
 	}
 
 	conn, err := grpc.DialContext(ctx, *qdrantAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
