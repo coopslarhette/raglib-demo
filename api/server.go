@@ -85,7 +85,7 @@ func (s *Server) useMiddleWare() {
 	s.router.Use(middleware.Recoverer)
 
 	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000"}, // Update with your frontend origin
+		AllowedOrigins:   []string{"http://localhost:3000", "https://raglib.vercel.app"}, // Update with your frontend origin
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
