@@ -1,12 +1,11 @@
 'use client'
+
 import React, { useState } from 'react'
 import styles from './SearchLandingPage.module.css'
 import { Button } from '@mui/base'
 import { SourceDocument } from '@/app/search/types'
 import { CitationBubble } from '@/app/search/CitationBubble'
 import { SourceCard } from '@/app/search/SourceCard'
-import { setHttpClientAndAgentOptions } from 'next/dist/server/setup-http-agent-env'
-import { number } from 'prop-types'
 import { Card, CardContent } from '@mui/material'
 import CodeBlock from '@/app/CodeBlock'
 
@@ -31,6 +30,13 @@ type CitationChunk = {
 
 type AnswerChunk = BaseChunk & (TextChunk | CitationChunk | CodeBlockChunk)
 
+const APIURL = process.env.NEXT_PUBLIC_API_URL
+
+function toURL(query: string) {
+    console.log(APIURL)
+    return `${APIURL}/search?q=${encodeURIComponent(query)}&corpus=web`
+}
+
 export default function SearchLandingPage() {
     const [query, setQuery] = useState('')
     const [documents, setDocuments] = useState<SourceDocument[]>([])
@@ -52,9 +58,8 @@ export default function SearchLandingPage() {
     const handleSearch = () => {
         setDocuments([])
         setAnswerChunks([])
-        const url = `http://localhost:5000/search?q=${encodeURIComponent(query)}&corpus=web`
 
-        const eventSource = new EventSource(url, {
+        const eventSource = new EventSource( toURL(query), {
             withCredentials: true,
         })
 
