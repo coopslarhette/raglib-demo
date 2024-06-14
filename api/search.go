@@ -61,12 +61,13 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	answerer := generation.NewAnswerer(s.openAIClient)
 
-	prompt := fmt.Sprintf("concisely answer this question: <question>%s</question>", query)
+	prompt := fmt.Sprintf("<question>%s</question>", query)
 	responseChan := make(chan string, 1)
 	shouldStream := true
 
 	go func() {
 		if err := answerer.Generate(ctx, prompt, documents, responseChan, shouldStream); err != nil {
+			fmt.Printf("error generating: %v", err)
 			render.Render(w, r, InternalServerError(errors.New(fmt.Sprintf("Error generating answer: %v", err))))
 			return
 		}

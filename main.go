@@ -36,8 +36,8 @@ func main() {
 	}
 	defer conn.Close()
 
-	config := openai.DefaultConfig(os.Getenv("OPENAI_API_KEY"))
-	//config.BaseURL = "https://api.together.xyz/v1"
+	config := openai.DefaultConfig(os.Getenv("GROQ_API_KEY"))
+	config.BaseURL = "https://api.groq.com/openai/v1"
 
 	openaiClient := openai.NewClientWithConfig(config)
 
