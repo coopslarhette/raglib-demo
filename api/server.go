@@ -15,14 +15,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"raglib/lib/retrieval"
+	"raglib/lib/retrieval/exa"
+	"raglib/lib/retrieval/serp"
 	"syscall"
 )
 
 type Server struct {
 	router             *chi.Mux
 	qdrantPointsClient qdrant.PointsClient
-	serpAPIClient      *retrieval.SERPAPIClient
+	serpAPIClient      *serp.Client
+	exaAPIClient       *exa.Client
 	openAIClient       *openai.Client
 }
 
@@ -30,7 +32,8 @@ func NewServer(conn *grpc.ClientConn, openAIClient *openai.Client) *Server {
 	s := &Server{
 		router:             chi.NewRouter(),
 		qdrantPointsClient: qdrant.NewPointsClient(conn),
-		serpAPIClient:      retrieval.NewSerpApiClient(os.Getenv("SERPAPI_API_KEY"), http.DefaultClient),
+		serpAPIClient:      serp.NewClient(os.Getenv("SERPAPI_API_KEY"), http.DefaultClient),
+		exaAPIClient:       exa.NewClient(os.Getenv("EXA_API_KEY"), http.DefaultClient),
 		openAIClient:       openAIClient,
 	}
 

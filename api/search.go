@@ -41,10 +41,18 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var webRetriever retrieval.Retriever
+	// TODO: use google ranking and document content from Exa
+	if true {
+		webRetriever = retrieval.NewExaRetriever(s.exaAPIClient)
+	} else {
+		webRetriever = retrieval.NewSERPRetriever(s.serpAPIClient)
+	}
+
 	personalCollectionName := "text_collection"
 	var retrieversByCorpus = map[string]retrieval.Retriever{
 		"personal": retrieval.NewQdrantRetriever(s.qdrantPointsClient, s.openAIClient, personalCollectionName),
-		"web":      retrieval.NewSERPRetriever(s.serpAPIClient),
+		"web":      webRetriever,
 	}
 
 	retrievers, errRenderer := corporaToRetrievers(corpora, retrieversByCorpus)
