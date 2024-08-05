@@ -10,6 +10,7 @@ import {
 } from '@mui/material'
 import { WebReference } from '@/app/search/types'
 import clsx from 'clsx'
+import { dateToHumanReadable } from '@/utils'
 
 type SourceCardProps = {
     source: WebReference
@@ -41,33 +42,23 @@ export function SourceCard({
                     />
                 )}
                 <CardContent className={styles.cardContent}>
-                    <div className={styles.header}>
-                        {favicon && (
+                    {favicon && (
+                        <div className={styles.header}>
                             <img
                                 src={favicon}
                                 alt="Favicon"
                                 className={styles.favicon}
                             />
-                        )}
-                        <Typography
-                            className={styles.displayedLink}
-                            variant="body2"
-                            color="text.secondary"
-                        >
-                            {displayedLink}
-                        </Typography>
-                    </div>
+                        </div>
+                    )}
                     <Typography variant="subtitle1" component="div">
                         {title}
                     </Typography>
                     <div className={styles.metadata}>
-                        {author && (
-                            <Typography variant="body2">
-                                Author: {author}
-                            </Typography>
-                        )}
                         {date && (
-                            <Typography variant="body2">{date}</Typography>
+                            <Typography variant="body2">
+                                {dateToHumanReadable(date)}
+                            </Typography>
                         )}
                     </div>
                 </CardContent>

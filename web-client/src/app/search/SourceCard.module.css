@@ -52,14 +52,12 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    margin-bottom: 8px;
+    font-size: 12px;
 }
 
 .content {
     margin-left: 32px;
-}
-
-.displayedLink {
-    margin-bottom: 8px;
 }
 
 .thumbnail {
@@ -75,6 +73,7 @@
 .metadata {
     display: flex;
     flex-wrap: wrap;
+    margin-top: auto;
     gap: 16px;
     color: #666;
     font-size: 14px;
