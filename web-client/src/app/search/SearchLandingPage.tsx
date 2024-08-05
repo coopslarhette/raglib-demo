@@ -6,7 +6,7 @@ import { Button } from '@mui/base'
 import { SourceDocument } from '@/app/search/types'
 import { CitationBubble } from '@/app/search/CitationBubble'
 import { SourceCard } from '@/app/search/SourceCard'
-import { Card, CardContent } from '@mui/material'
+import { Card, CardContent, CircularProgress } from '@mui/material'
 import CodeBlock from '@/app/CodeBlock'
 
 type BaseChunk = {
@@ -44,6 +44,7 @@ export default function SearchLandingPage() {
     const [hoveredCitationIndex, setHoveredCitationIndex] = useState<
         null | number
     >(null)
+    const [isSearchResponseLoading, setIsSearchResponseLoading] = useState(true)
 
     const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         setQuery(event.target.value)
@@ -58,49 +59,78 @@ export default function SearchLandingPage() {
     const handleSearch = () => {
         setDocuments([])
         setAnswerChunks([])
+        setIsSearchResponseLoading(true)
 
-        const eventSource = new EventSource( toURL(query), {
+        const withSpinnerCanceller = (
+            listener: (this: EventSource, event: MessageEvent<any>) => any
+        ) => {
+            function wrapped(this: EventSource, event: MessageEvent<any>) {
+                setIsSearchResponseLoading(false)
+
+                listener.call(this, event)
+            }
+
+            return wrapped
+        }
+
+        const eventSource = new EventSource(toURL(query), {
             withCredentials: true,
         })
 
-        eventSource.addEventListener('text', (event) => {
-            const data = JSON.parse(event.data)
+        eventSource.addEventListener(
+            'text',
+            withSpinnerCanceller((event) => {
+                const data = JSON.parse(event.data)
 
-            setAnswerChunks((prev) => [
-                ...prev,
-                { type: 'text', value: data, ID: data.ID },
-            ])
-        })
+                setAnswerChunks((prev) => [
+                    ...prev,
+                    { type: 'text', value: data, ID: data.ID },
+                ])
+            })
+        )
 
-        eventSource.addEventListener('citation', (event) => {
-            const data = JSON.parse(event.data)
+        eventSource.addEventListener(
+            'citation',
+            withSpinnerCanceller((event) => {
+                const data = JSON.parse(event.data)
 
-            setAnswerChunks((prev) => [
-                ...prev,
-                { type: 'citation', value: data, ID: data.ID },
-            ])
-        })
+                setAnswerChunks((prev) => [
+                    ...prev,
+                    { type: 'citation', value: data, ID: data.ID },
+                ])
+            })
+        )
 
-        eventSource.addEventListener('documentsreference', (event) => {
-            const data = JSON.parse(event.data)
-            setDocuments(data)
-        })
+        eventSource.addEventListener(
+            'documentsreference',
+            withSpinnerCanceller((event) => {
+                const data = JSON.parse(event.data)
+                setDocuments(data)
+            })
+        )
 
-        eventSource.addEventListener('codeblock', (event) => {
-            const data = JSON.parse(event.data)
-            setAnswerChunks((prev) => [
-                ...prev,
-                { type: 'codeblock', value: data, ID: data.ID },
-            ])
-        })
+        eventSource.addEventListener(
+            'codeblock',
+            withSpinnerCanceller((event) => {
+                const data = JSON.parse(event.data)
+                setAnswerChunks((prev) => [
+                    ...prev,
+                    { type: 'codeblock', value: data, ID: data.ID },
+                ])
+            })
+        )
 
-        eventSource.addEventListener('done', (event) => {
-            eventSource.close()
-        })
+        eventSource.addEventListener(
+            'done',
+            withSpinnerCanceller((event) => {
+                eventSource.close()
+            })
+        )
 
         eventSource.onerror = (err) => {
             console.error(err)
             eventSource.close()
+            setIsSearchResponseLoading(false)
         }
     }
 
@@ -118,6 +148,12 @@ export default function SearchLandingPage() {
                     Search
                 </Button>
             </div>
+            {isSearchResponseLoading && (
+                <CircularProgress
+                    style={{ color: 'var(--brand-teal)' }}
+                    className={styles.loadingSpinner}
+                />
+            )}
             {documents.length > 0 && (
                 <div className={styles.resultSection}>
                     <h2>Sources</h2>

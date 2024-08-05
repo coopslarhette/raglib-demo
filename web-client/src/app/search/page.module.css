@@ -8,3 +8,7 @@
     padding: 70px 0;
     gap: 32px;
 }
+
+.header {
+    color: var(--brand-teal);
+}

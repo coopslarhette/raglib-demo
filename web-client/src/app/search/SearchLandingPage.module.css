@@ -3,18 +3,28 @@
     flex-direction: column;
     gap: 64px;
     padding-bottom: 64px;
+    align-items: center;
 }
 
 .searchBar {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 100%;
+    gap: 16px;
+
+    .loadingSpinner {
+        display: flex;
+        color: #869f77 !important;
+    }
+
+    .loadingSpinner > * {
+
+    }
 }
 
 .searchInput {
-    width: 100%;
     max-width: 600px;
+    width: 300px;
     padding: 10px;
     border-radius: 20px;
     border: 1px solid #ccc;
@@ -30,7 +40,6 @@
     transition: background-color 0.3s ease;
     color: var(--graphite-text);
     font-size: 16px;
-    margin-left: 10px;
     cursor: pointer;
 
     &:hover {
