@@ -44,7 +44,7 @@ export default function SearchLandingPage() {
     const [hoveredCitationIndex, setHoveredCitationIndex] = useState<
         null | number
     >(null)
-    const [isSearchResponseLoading, setIsSearchResponseLoading] = useState(true)
+    const [isSearchResponseLoading, setIsSearchResponseLoading] = useState(false)
 
     const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         setQuery(event.target.value)
