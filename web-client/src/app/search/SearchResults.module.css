@@ -1,0 +1,26 @@
+.resultSection {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    .cardContent {
+        border-radius: 12px;
+    }
+
+    .answerCard {
+        border-radius: 12px;
+        padding: 12px 16px;
+    }
+
+    .answerText {
+        font-size: 18px;
+        line-height: 1.6;
+    }
+}
+
+.sourceContainer {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* 3 equal columns */
+    grid-auto-rows: auto; /* auto height for rows */
+    gap: 12px; /* adjust the gap between grid items */
+}
