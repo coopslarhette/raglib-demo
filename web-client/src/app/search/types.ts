@@ -20,3 +20,25 @@ export type SourceDocument = {
     source: Source
     webReference?: WebReference
 }
+
+export type BaseChunk = {
+    ID: string
+}
+
+export type TextChunk = {
+    type: 'text'
+    value: string
+}
+
+export type CodeBlockChunk = {
+    type: 'codeblock'
+    value: string
+}
+
+export type CitationChunk = {
+    type: 'citation'
+    value: number
+}
+
+export type AnswerChunk = BaseChunk &
+    (TextChunk | CitationChunk | CodeBlockChunk)
