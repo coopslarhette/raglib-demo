@@ -6,6 +6,10 @@
     align-items: center;
 }
 
+.headers {
+    color: var(--brand-teal);
+}
+
 .searchBar {
     display: flex;
     align-items: center;
@@ -18,7 +22,6 @@
     }
 
     .loadingSpinner > * {
-
     }
 }
 

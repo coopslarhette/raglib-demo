@@ -163,7 +163,7 @@ export default function SearchLandingPage() {
             )}
             {documents.length > 0 && (
                 <div className={styles.resultSection}>
-                    <h2>Sources</h2>
+                    <h2 className={styles.headers}>Sources</h2>
                     <div className={styles.sourceContainer}>
                         {documents.map((document, index) => {
                             return (
@@ -181,7 +181,7 @@ export default function SearchLandingPage() {
             )}
             {answerChunks.length > 0 && (
                 <div className={styles.resultSection}>
-                    <h2>Synthesis</h2>
+                    <h2 className={styles.headers}>Synthesis</h2>
                     <Card className={styles.answerCard}>
                         <CardContent className={styles.cardContent}>
                             {answerChunks.map((ac) => (
