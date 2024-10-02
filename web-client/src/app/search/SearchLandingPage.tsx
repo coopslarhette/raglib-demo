@@ -44,9 +44,12 @@ export default function SearchLandingPage() {
     const [hoveredCitationIndex, setHoveredCitationIndex] = useState<
         null | number
     >(null)
-    const [isSearchResponseLoading, setIsSearchResponseLoading] = useState(false)
+    const [isSearchResponseLoading, setIsSearchResponseLoading] =
+        useState(false)
 
-    const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSearchInputChange = (
+        event: React.ChangeEvent<HTMLInputElement>
+    ) => {
         setQuery(event.target.value)
     }
 
@@ -140,11 +143,15 @@ export default function SearchLandingPage() {
                 <input
                     placeholder="Why are peppers spicy?"
                     value={query}
-                    onChange={handleInputChange}
+                    onChange={handleSearchInputChange}
                     onKeyDown={handleKeyPress}
                     className={styles.searchInput}
                 />
-                <Button onClick={handleSearch} className={styles.searchButton}>
+                <Button
+                    onClick={handleSearch}
+                    disabled={query.length === 0}
+                    className={styles.searchButton}
+                >
                     Search
                 </Button>
             </div>
@@ -174,7 +181,7 @@ export default function SearchLandingPage() {
             )}
             {answerChunks.length > 0 && (
                 <div className={styles.resultSection}>
-                    <h2>Results</h2>
+                    <h2>Synthesis</h2>
                     <Card className={styles.answerCard}>
                         <CardContent className={styles.cardContent}>
                             {answerChunks.map((ac) => (
