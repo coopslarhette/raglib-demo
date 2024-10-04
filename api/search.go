@@ -63,7 +63,8 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	documents, err := retrieveAllDocuments(ctx, query, retrievers)
 	if err != nil {
-		render.Render(w, r, InternalServerError(errors.New(fmt.Sprintf("Error retrieving documents: %v", err))))
+		fmt.Printf("error retrieving documents: %v", err)
+		render.Render(w, r, InternalServerError(errors.New("error retrieving documents")))
 		return
 	}
 
@@ -92,22 +93,26 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	stream := sse.NewStream(w)
 	if err = stream.Establish(); err != nil {
+		fmt.Printf("error establishing stream: %v", err)
 		render.Render(w, r, InternalServerError(errors.New(fmt.Sprintf("Error establishing stream: %v", err))))
 	}
 
 	documentsReference := sse.Event{EventType: "documentsreference", Data: documents}
 	if err := stream.Write(documentsReference); err != nil {
+		fmt.Printf("error writing to stream: %v", err)
 		stream.Error("Error writing to stream.")
 	}
 
 	// Send events to the client
 	for chunk := range bufferedChunkChan {
 		if err := stream.Write(chunk); err != nil {
+			fmt.Printf("error writing to stream: %v", err)
 			stream.Error("Error writing to stream.")
 		}
 	}
 
 	if err = stream.Write(sse.Event{EventType: "done", Data: "DONE"}); err != nil {
+		fmt.Printf("error writing to stream: %v", err)
 		stream.Error("Error writing to stream.")
 	}
 }

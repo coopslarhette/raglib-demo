@@ -5,6 +5,7 @@ import (
 	"net/http"
 )
 
+// TODO: rework
 type ErrResponse struct {
 	Error          error  `json:"-"`
 	HTTPStatusCode int    `json:"-"`
