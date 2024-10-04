@@ -1,29 +1,25 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import styles from './SearchBar.module.css'
 import { Button } from '@mui/base'
 
 interface SearchBarProps {
-    query: string
-    setQuery: (query: string) => void
-    onSearch: () => void
+    initialQuery: string
+    onSearch: (query: string) => void
 }
 
-export default function SearchBar({
-    query,
-    setQuery,
-    onSearch,
-}: SearchBarProps) {
+export default function SearchBar({ initialQuery, onSearch }: SearchBarProps) {
+    const [query, setQuery] = useState(initialQuery)
     const handleKeyPress = (event: React.KeyboardEvent<HTMLDivElement>) => {
         if (event.key === 'Enter') {
-            onSearch()
+            onSearch(query)
         }
     }
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        onSearch()
+        onSearch(query)
     }
 
     return (

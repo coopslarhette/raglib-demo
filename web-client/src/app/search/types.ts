@@ -21,7 +21,7 @@ export type SourceDocument = {
     webReference?: WebReference
 }
 
-export type EventType =
+export type ChunkType =
     | 'text'
     | 'citation'
     | 'documentsreference'
@@ -30,7 +30,7 @@ export type EventType =
 
 export type BaseChunk = {
     ID: string
-    type: EventType
+    type: ChunkType
 }
 
 export type TextChunk = {
