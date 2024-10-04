@@ -8,6 +8,7 @@ export default function SearchPage({
 }: {
     searchParams: { q?: string }
 }) {
+
     return (
         <div className={styles.root}>
             <h2 className={styles.header}>RAGLib</h2>

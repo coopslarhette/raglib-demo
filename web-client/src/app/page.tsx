@@ -9,8 +9,7 @@ export default function SearchHome() {
     const [query, setQuery] = useState('')
     const router = useRouter()
 
-    const handleSubmit = (e?: React.FormEvent) => {
-        e?.preventDefault()
+    const handleSubmit = () => {
         const q = query.trim()
 
         if (q) {

@@ -10,26 +10,15 @@ import AnswerSection from './AnswerSection'
 interface SearchResultsProps {
     documents: SourceDocument[]
     answerChunks: AnswerChunk[]
-    isLoading: boolean
 }
 
 export default function SearchResults({
     documents,
     answerChunks,
-    isLoading,
 }: SearchResultsProps) {
     const [hoveredCitationIndex, setHoveredCitationIndex] = useState<
         null | number
     >(null)
-
-    if (isLoading) {
-        return (
-            <CircularProgress
-                style={{ color: 'var(--brand-teal)' }}
-                className={styles.loadingSpinner}
-            />
-        )
-    }
 
     return (
         <>

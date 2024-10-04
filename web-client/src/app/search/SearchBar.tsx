@@ -7,7 +7,7 @@ import { Button } from '@mui/base'
 interface SearchBarProps {
     query: string
     setQuery: (query: string) => void
-    onSearch: (e?: React.FormEvent) => void
+    onSearch: () => void
 }
 
 export default function SearchBar({
@@ -21,9 +21,14 @@ export default function SearchBar({
         }
     }
 
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault()
+        onSearch()
+    }
+
     return (
         <div className={styles.searchBar}>
-            <form onSubmit={onSearch} className={styles.searchForm}>
+            <form onSubmit={handleSubmit} className={styles.searchForm}>
                 <input
                     type="text"
                     value={query}

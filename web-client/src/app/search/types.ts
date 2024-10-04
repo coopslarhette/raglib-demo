@@ -21,8 +21,16 @@ export type SourceDocument = {
     webReference?: WebReference
 }
 
+export type EventType =
+    | 'text'
+    | 'citation'
+    | 'documentsreference'
+    | 'codeblock'
+    | 'done'
+
 export type BaseChunk = {
     ID: string
+    type: EventType
 }
 
 export type TextChunk = {

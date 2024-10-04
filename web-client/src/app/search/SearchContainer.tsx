@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { SourceDocument, AnswerChunk } from './types'
+import { AnswerChunk, EventType, SourceDocument } from './types'
 import SearchBar from './SearchBar'
 import { toSearchURL } from '@/api'
+import { CircularProgress } from '@mui/material'
 
 const SearchResults = dynamic(() => import('./SearchResults'), { ssr: false })
 
@@ -19,20 +20,21 @@ export default function SearchContainer({
     const [query, setQuery] = useState(initialQuery)
     const [documents, setDocuments] = useState<SourceDocument[]>([])
     const [answerChunks, setAnswerChunks] = useState<AnswerChunk[]>([])
-    const [isSearchResponseLoading, setIsSearchResponseLoading] =
-        useState(false)
+    const [isResponseLoading, setIsResponseLoading] = useState(
+        initialQuery.length > 0
+    )
 
     const router = useRouter()
-    const searchParams = useSearchParams()
 
     useEffect(() => {
-        if (initialQuery) {
+        if (initialQuery.length > 0) {
             handleSearch()
         }
     }, [initialQuery])
 
-    const handleSearch = async () => {
-        setIsSearchResponseLoading(true)
+    const handleSearch = () => {
+        router.push(`/search?q=${encodeURIComponent(query)}`, { scroll: false })
+        setIsResponseLoading(true)
         setDocuments([])
         setAnswerChunks([])
 
@@ -40,7 +42,7 @@ export default function SearchContainer({
             listener: (this: EventSource, event: MessageEvent<any>) => any
         ) => {
             function wrapped(this: EventSource, event: MessageEvent<any>) {
-                setIsSearchResponseLoading(false)
+                setIsResponseLoading(false)
                 listener.call(this, event)
             }
             return wrapped
@@ -50,63 +52,90 @@ export default function SearchContainer({
             withCredentials: true,
         })
 
-        eventSource.addEventListener(
-            'text',
-            withSpinnerCanceller((event) => {
-                const data = JSON.parse(event.data)
-                setAnswerChunks((prev) => [
-                    ...prev,
-                    { type: 'text', value: data, ID: data.ID },
-                ])
-            })
-        )
+        // We save this to debug in onerror handler
+        let lastEventData: string | null = null
 
-        eventSource.addEventListener(
-            'citation',
-            withSpinnerCanceller((event) => {
+        const eventHandler = (eventType: EventType) =>
+            withSpinnerCanceller((event: MessageEvent) => {
+                lastEventData = event.data
                 const data = JSON.parse(event.data)
-                setAnswerChunks((prev) => [
-                    ...prev,
-                    { type: 'citation', value: data, ID: data.ID },
-                ])
+                switch (eventType) {
+                    case 'text':
+                        setAnswerChunks((prev) => [
+                            ...prev,
+                            {
+                                ...data,
+                                type: 'text',
+                                value: data as string,
+                            },
+                        ])
+                        break
+                    case 'citation':
+                        setAnswerChunks((prev) => [
+                            ...prev,
+                            {
+                                ...data,
+                                type: 'citation',
+                                value: data as number,
+                            },
+                        ])
+                        break
+                    case 'codeblock':
+                        setAnswerChunks((prev) => [
+                            ...prev,
+                            {
+                                ...data,
+                                type: 'codeblock',
+                                value: data as string,
+                            },
+                        ])
+                        break
+                    case 'documentsreference':
+                        setDocuments(data as SourceDocument[])
+                        break
+                    case 'done':
+                        eventSource.close()
+                        break
+                }
             })
-        )
 
-        eventSource.addEventListener(
-            'documentsreference',
-            withSpinnerCanceller((event) => {
-                const data = JSON.parse(event.data)
-                setDocuments(data)
-            })
-        )
-
-        eventSource.addEventListener(
-            'codeblock',
-            withSpinnerCanceller((event) => {
-                const data = JSON.parse(event.data)
-                setAnswerChunks((prev) => [
-                    ...prev,
-                    { type: 'codeblock', value: data, ID: data.ID },
-                ])
-            })
-        )
-
-        eventSource.addEventListener(
-            'done',
-            withSpinnerCanceller((event) => {
-                eventSource.close()
-            })
-        )
+        ;(
+            [
+                'text',
+                'citation',
+                'documentsreference',
+                'codeblock',
+                'done',
+            ] as EventType[]
+        ).forEach((eventType) => {
+            eventSource.addEventListener(eventType, eventHandler(eventType))
+        })
 
         eventSource.onerror = (err) => {
-            console.error(err)
-            eventSource.close()
-            setIsSearchResponseLoading(false)
-        }
-        setIsSearchResponseLoading(false)
+            console.error('There was an error with the event source')
 
-        // Update URL with the current query
-        router.push(`/search?q=${encodeURIComponent(query)}`, { scroll: false })
+            if (lastEventData) {
+                try {
+                    const parsedData = JSON.parse(lastEventData)
+                    console.log('Last received data:', parsedData)
+                    if ('error' in parsedData) {
+                        console.error('Error details:', parsedData.error)
+                    }
+                } catch (parseError) {
+                    console.log(
+                        'Unable to parse last received data:',
+                        lastEventData
+                    )
+                }
+            } else {
+                console.log('No data was received before the error occurred')
+            }
+
+            // might want to implement a reconnection strategy here
+            // For now, we'll just close the connection
+            eventSource.close()
+            setIsResponseLoading(false)
+        }
     }
 
     return (
@@ -116,11 +145,14 @@ export default function SearchContainer({
                 setQuery={setQuery}
                 onSearch={handleSearch}
             />
-            <SearchResults
-                documents={documents}
-                answerChunks={answerChunks}
-                isLoading={isSearchResponseLoading}
-            />
+            {isResponseLoading ? (
+                <CircularProgress style={{ color: 'var(--brand-teal)' }} />
+            ) : (
+                <SearchResults
+                    documents={documents}
+                    answerChunks={answerChunks}
+                />
+            )}
         </>
     )
 }
