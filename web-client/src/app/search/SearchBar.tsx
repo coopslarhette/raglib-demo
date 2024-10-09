@@ -5,11 +5,14 @@ import styles from './SearchBar.module.css'
 import { Button } from '@mui/base'
 
 interface SearchBarProps {
-    initialQuery: string
     onSearch: (query: string) => void
+    initialQuery?: string
 }
 
-export default function SearchBar({ initialQuery, onSearch }: SearchBarProps) {
+export default function SearchBar({
+    initialQuery = '',
+    onSearch,
+}: SearchBarProps) {
     const [query, setQuery] = useState(initialQuery)
     const handleKeyPress = (event: React.KeyboardEvent<HTMLDivElement>) => {
         if (event.key === 'Enter') {

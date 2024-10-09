@@ -1,17 +1,14 @@
 'use client'
 
-import React, { useState } from 'react'
+import React from 'react'
 import { useRouter } from 'next/navigation'
 import styles from './page.module.css'
 import SearchBar from '@/app/search/SearchBar'
 
 export default function SearchHome() {
-    const [query, setQuery] = useState('')
     const router = useRouter()
 
-    const handleSubmit = () => {
-        const q = query.trim()
-
+    const handleSubmit = (q: string) => {
         if (q) {
             router.push(`/search?q=${encodeURIComponent(q)}`)
         }
@@ -20,11 +17,7 @@ export default function SearchHome() {
     return (
         <div className={styles.container}>
             <h1 className={styles.title}>RAGLib Search</h1>
-            <SearchBar
-                query={query}
-                setQuery={setQuery}
-                onSearch={handleSubmit}
-            />
+            <SearchBar onSearch={handleSubmit} />
         </div>
     )
 }
