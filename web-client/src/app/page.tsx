@@ -4,6 +4,7 @@ import React from 'react'
 import { useRouter } from 'next/navigation'
 import styles from './page.module.css'
 import SearchBar from '@/app/search/SearchBar'
+import SuggestedQueries from '@/app/search/SuggestedQueries'
 
 export default function SearchHome() {
     const router = useRouter()
@@ -18,6 +19,7 @@ export default function SearchHome() {
         <div className={styles.container}>
             <h1 className={styles.title}>RAGLib Search</h1>
             <SearchBar onSearch={handleSubmit} />
+            <SuggestedQueries onQueryClick={handleSubmit} />
         </div>
     )
 }
