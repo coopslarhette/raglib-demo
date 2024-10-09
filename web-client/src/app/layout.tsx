@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "RAGLib Demo",
+  title: "RAGLib Search",
   description: "Demo of a Golang library for doing retrieval-augmented generation.",
 };
 
