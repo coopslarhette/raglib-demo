@@ -1,38 +1,62 @@
 package api
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/go-chi/render"
 	"net/http"
 )
 
-// TODO: rework
+type ErrorCode int
+
+const (
+	ErrCodeUnknown ErrorCode = iota
+	ErrCodeMalformedRequest
+	ErrCodeInternalServer
+)
+
 type ErrResponse struct {
-	Error          error  `json:"-"`
-	HTTPStatusCode int    `json:"-"`
-	StatusText     string `json:"status"`
-	AppCode        int64  `json:"code,omitempty"`
-	ErrorText      string `json:"error,omitempty"`
+	HTTPStatusCode int       `json:"-"`
+	Code           ErrorCode `json:"code"`
+	Message        string    `json:"message"`
+	Details        string    `json:"details,omitempty"`
 }
 
 func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
+	e.Log()
 	render.Status(r, e.HTTPStatusCode)
 	return nil
 }
 
-func ErrorMalformedRequest(err error) render.Renderer {
+func NewErrorResponse(httpStatus int, code ErrorCode, message string, details string) render.Renderer {
 	return &ErrResponse{
-		Error:          err,
-		HTTPStatusCode: http.StatusBadRequest,
-		StatusText:     "Malformed request.",
-		ErrorText:      err.Error(),
+		HTTPStatusCode: httpStatus,
+		Code:           code,
+		Message:        message,
+		Details:        details,
 	}
 }
 
-func InternalServerError(err error) render.Renderer {
-	return &ErrResponse{
-		Error:          err,
-		HTTPStatusCode: http.StatusInternalServerError,
-		StatusText:     "Internal server error.",
-		ErrorText:      err.Error(),
-	}
+func MalformedRequest(details string) render.Renderer {
+	return NewErrorResponse(
+		http.StatusBadRequest,
+		ErrCodeMalformedRequest,
+		"Malformed request",
+		details,
+	)
+}
+
+func InternalServerError(details string) render.Renderer {
+	return NewErrorResponse(
+		http.StatusInternalServerError,
+		ErrCodeInternalServer,
+		"Internal server error",
+		details,
+	)
+}
+
+// Log logs the full error details for internal use
+func (e *ErrResponse) Log() {
+	jsonError, _ := json.Marshal(e)
+	fmt.Println(jsonError)
 }

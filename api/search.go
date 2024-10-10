@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/go-chi/render"
 	"golang.org/x/sync/errgroup"
@@ -34,10 +33,10 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	if len(corpora) == 0 {
-		render.Render(w, r, ErrorMalformedRequest(errors.New("at least one 'corpus' parameter is required")))
+		render.Render(w, r, MalformedRequest("at least one 'corpus' parameter is required"))
 		return
 	} else if len(query) == 0 {
-		render.Render(w, r, ErrorMalformedRequest(errors.New("query parameter, 'q', is required")))
+		render.Render(w, r, MalformedRequest("query parameter, 'q', is required"))
 		return
 	}
 
@@ -55,16 +54,15 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		"web":      webRetriever,
 	}
 
-	retrievers, errRenderer := corporaToRetrievers(corpora, retrieversByCorpus)
-	if errRenderer != nil {
-		render.Render(w, r, errRenderer)
+	retrievers, err := corporaToRetrievers(corpora, retrieversByCorpus)
+	if err != nil {
+		render.Render(w, r, MalformedRequest(err.Error()))
 		return
 	}
 
 	documents, err := retrieveAllDocuments(ctx, query, retrievers)
 	if err != nil {
-		fmt.Printf("error retrieving documents: %v", err)
-		render.Render(w, r, InternalServerError(errors.New("error retrieving documents")))
+		render.Render(w, r, InternalServerError(fmt.Sprintf("error retrieving documents: %v", err)))
 		return
 	}
 
@@ -76,8 +74,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	go func() {
 		if err := answerer.Generate(ctx, prompt, documents, responseChan, shouldStream); err != nil {
-			fmt.Printf("error generating: %v", err)
-			render.Render(w, r, InternalServerError(errors.New(fmt.Sprintf("Error generating answer: %v", err))))
+			render.Render(w, r, InternalServerError(fmt.Sprintf("error generating answer: %v", err)))
 			return
 		}
 	}()
@@ -93,8 +90,8 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	stream := sse.NewStream(w)
 	if err = stream.Establish(); err != nil {
-		fmt.Printf("error establishing stream: %v", err)
-		render.Render(w, r, InternalServerError(errors.New(fmt.Sprintf("Error establishing stream: %v", err))))
+		render.Render(w, r, InternalServerError(fmt.Sprintf("error establishing stream: %v", err)))
+		return
 	}
 
 	documentsReference := sse.Event{EventType: "documentsreference", Data: documents}
@@ -117,12 +114,12 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func corporaToRetrievers(corporaSelection []string, retrieversByCorpus map[string]retrieval.Retriever) ([]retrieval.Retriever, render.Renderer) {
+func corporaToRetrievers(corporaSelection []string, retrieversByCorpus map[string]retrieval.Retriever) ([]retrieval.Retriever, error) {
 	retrievers := make([]retrieval.Retriever, len(corporaSelection))
 	for i, c := range corporaSelection {
 		retriever, ok := retrieversByCorpus[c]
 		if !ok {
-			return nil, ErrorMalformedRequest(errors.New(fmt.Sprintf("Corpus, %v, is invalid", c)))
+			return nil, fmt.Errorf("corpus, %v, is invalid", c)
 		}
 		retrievers[i] = retriever
 	}
