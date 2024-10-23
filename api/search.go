@@ -70,78 +70,88 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
-
 	retrievers, err := s.determineRetrievers(corpora)
 	if err != nil {
 		render.Render(w, r, MalformedRequest(err.Error()))
 		return
 	}
 
-	documents, err := retrieveAllDocuments(ctx, query, retrievers)
+	documents, err := retrieveAllDocuments(r.Context(), query, retrievers)
 	if err != nil {
 		render.Render(w, r, InternalServerError(fmt.Sprintf("error retrieving documents: %v", err)))
 		return
 	}
 
+	g, gctx := errgroup.WithContext(r.Context())
+
 	answerer := generation.NewAnswerer(s.openAIClient)
 	shouldStream := true
 
 	rawChunkChan := make(chan string, 1)
-	defer close(rawChunkChan)
+	processedChunkChan := make(chan sse.Event, 1)
+
+	defer func() {
+		close(rawChunkChan)
+		close(processedChunkChan)
+	}()
 
 	prompt := fmt.Sprintf("<question>%s</question>", query)
-	go func() {
-		if err := answerer.Generate(ctx, prompt, documents, rawChunkChan, shouldStream); err != nil {
-			cancel()
-			render.Render(w, r, InternalServerError(fmt.Sprintf("error generating answer: %v", err)))
-			return
-		}
-	}()
+	g.Go(func() error {
+		return answerer.Generate(gctx, prompt, documents, rawChunkChan, shouldStream)
+	})
 
 	if !shouldStream {
 		select {
 		case text := <-rawChunkChan:
+			if err := g.Wait(); err != nil {
+				render.Render(w, r, InternalServerError(fmt.Sprintf("error generating answer: %v", err)))
+				return
+			}
 			render.JSON(w, r, SearchResponse{text})
-		case <-ctx.Done():
+		case <-gctx.Done():
 			render.Render(w, r, InternalServerError("request cancelled"))
 		}
 		return
 	}
 
-	processedChunkChan := make(chan sse.Event, 1)
-
 	chunkProcessor := ChunkProcessor{}
-	go chunkProcessor.ProcessChunks(ctx, rawChunkChan, processedChunkChan)
+	g.Go(func() error {
+		chunkProcessor.ProcessChunks(gctx, rawChunkChan, processedChunkChan)
+		return nil
+	})
 
-	if err := s.setupAndRunSSEStream(w, r, ctx, documents, processedChunkChan); err != nil {
-		render.Render(w, r, InternalServerError(fmt.Sprintf("error with SSE stream: %v", err)))
-	}
-}
-
-func (s *Server) setupAndRunSSEStream(w http.ResponseWriter, r *http.Request, ctx context.Context, documents []document.Document, processedChunkChan <-chan sse.Event) error {
 	stream := sse.NewStream(w)
 	if err := stream.Establish(); err != nil {
-		return fmt.Errorf("error establishing stream: %v", err)
+		render.Render(w, r, InternalServerError(fmt.Sprintf("error establishing stream: %v", err)))
 	}
 
 	documentsReference := sse.Event{EventType: "documentsreference", Data: documents}
-	if err := stream.Write(documentsReference); err != nil {
-		return fmt.Errorf("error writing documents reference: %v", err)
-	}
+	stream.Write(documentsReference)
 
+	g.Go(func() error {
+		s.writeChunksToStream(gctx, stream, processedChunkChan)
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		// TODO, figure out what we should do with this error
+		// especially if a Stream.Write error occurs
+		return
+	}
+}
+
+func (s *Server) writeChunksToStream(ctx context.Context, stream sse.Stream, processedChunkChan <-chan sse.Event) {
 	for {
 		select {
 		case chunk, ok := <-processedChunkChan:
 			if !ok {
-				return stream.Write(sse.Event{EventType: "done", Data: "DONE"})
+				stream.Write(sse.Event{EventType: "done", Data: "DONE"})
 			}
 			if err := stream.Write(chunk); err != nil {
-				return fmt.Errorf("error writing chunk: %v", err)
+				//	Unsure how to handle Write errors for now
 			}
 		case <-ctx.Done():
-			return stream.Write(sse.Event{EventType: "cancelled", Data: "Request cancelled"})
+			stream.Write(sse.Event{EventType: "cancelled", Data: "Request cancelled"})
 		}
 	}
 }
