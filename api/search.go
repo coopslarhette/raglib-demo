@@ -26,20 +26,22 @@ type CitationChunk struct {
 	Value int    `json:"value"`
 }
 
-func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) validateAndExtractParams(r *http.Request) (query string, corpora []string, err error) {
 	queryParams := r.URL.Query()
-	query := queryParams.Get("q")
-	corpora := queryParams["corpus"]
-	ctx := r.Context()
+	query = queryParams.Get("q")
+	corpora = queryParams["corpus"]
 
 	if len(corpora) == 0 {
-		render.Render(w, r, MalformedRequest("at least one 'corpus' parameter is required"))
-		return
-	} else if len(query) == 0 {
-		render.Render(w, r, MalformedRequest("query parameter, 'q', is required"))
-		return
+		return "", nil, fmt.Errorf("at least one 'corpus' parameter is required")
+	}
+	if len(query) == 0 {
+		return "", nil, fmt.Errorf("query parameter, 'q', is required")
 	}
 
+	return query, corpora, nil
+}
+
+func (s *Server) determineRetrievers(corpora []string) ([]retrieval.Retriever, error) {
 	var webRetriever retrieval.Retriever
 	// TODO: use google ranking and document content from Exa
 	if true {
@@ -56,6 +58,23 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	retrievers, err := corporaToRetrievers(corpora, retrieversByCorpus)
 	if err != nil {
+		return nil, err
+	}
+	return retrievers, nil
+}
+
+func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
+	query, corpora, err := s.validateAndExtractParams(r)
+	if err != nil {
+		render.Render(w, r, MalformedRequest(err.Error()))
+		return
+	}
+
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
+	retrievers, err := s.determineRetrievers(corpora)
+	if err != nil {
 		render.Render(w, r, MalformedRequest(err.Error()))
 		return
 	}
@@ -67,50 +86,64 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	answerer := generation.NewAnswerer(s.openAIClient)
-
-	prompt := fmt.Sprintf("<question>%s</question>", query)
-	responseChan := make(chan string, 1)
 	shouldStream := true
 
+	responseChan := make(chan string, 1)
+	defer close(responseChan)
+
+	prompt := fmt.Sprintf("<question>%s</question>", query)
 	go func() {
 		if err := answerer.Generate(ctx, prompt, documents, responseChan, shouldStream); err != nil {
+			cancel()
 			render.Render(w, r, InternalServerError(fmt.Sprintf("error generating answer: %v", err)))
 			return
 		}
 	}()
 
 	if !shouldStream {
-		text := <-responseChan
-		render.JSON(w, r, SearchResponse{text})
+		select {
+		case text := <-responseChan:
+			render.JSON(w, r, SearchResponse{text})
+		case <-ctx.Done():
+			render.Render(w, r, InternalServerError("request cancelled"))
+		}
+		return
 	}
 
 	bufferedChunkChan := make(chan sse.Event, 1)
-	cp := ChunkProcessor{}
-	go cp.ProcessChunks(responseChan, bufferedChunkChan)
+	defer close(bufferedChunkChan)
 
+	chunkProcessor := ChunkProcessor{}
+	go chunkProcessor.ProcessChunks(ctx, responseChan, bufferedChunkChan)
+
+	if err := s.setupAndRunSSEStream(w, r, ctx, documents, bufferedChunkChan); err != nil {
+		render.Render(w, r, InternalServerError(fmt.Sprintf("error with SSE stream: %v", err)))
+	}
+}
+
+func (s *Server) setupAndRunSSEStream(w http.ResponseWriter, r *http.Request, ctx context.Context, documents []document.Document, bufferedChunkChan <-chan sse.Event) error {
 	stream := sse.NewStream(w)
-	if err = stream.Establish(); err != nil {
-		render.Render(w, r, InternalServerError(fmt.Sprintf("error establishing stream: %v", err)))
-		return
+	if err := stream.Establish(); err != nil {
+		return fmt.Errorf("error establishing stream: %v", err)
 	}
 
 	documentsReference := sse.Event{EventType: "documentsreference", Data: documents}
 	if err := stream.Write(documentsReference); err != nil {
-		fmt.Printf("error writing to stream: %v", err)
-		stream.Error("Error writing to stream.")
+		return fmt.Errorf("error writing documents reference: %v", err)
 	}
 
-	// Send events to the client
-	for chunk := range bufferedChunkChan {
-		if err := stream.Write(chunk); err != nil {
-			fmt.Printf("error writing to stream: %v", err)
-			stream.Error("Error writing to stream.")
+	for {
+		select {
+		case chunk, ok := <-bufferedChunkChan:
+			if !ok {
+				return stream.Write(sse.Event{EventType: "done", Data: "DONE"})
+			}
+			if err := stream.Write(chunk); err != nil {
+				return fmt.Errorf("error writing chunk: %v", err)
+			}
+		case <-ctx.Done():
+			return stream.Write(sse.Event{EventType: "cancelled", Data: "Request cancelled"})
 		}
-	}
-
-	if err = stream.Write(sse.Event{EventType: "done", Data: "DONE"}); err != nil {
-		fmt.Printf("error writing to stream: %v", err)
-		stream.Error("Error writing to stream.")
 	}
 }
 

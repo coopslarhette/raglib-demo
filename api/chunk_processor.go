@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"raglib/api/sse"
 	"strconv"
@@ -22,27 +23,42 @@ const (
 )
 
 // ProcessChunks should maybe be a standalone function instead of being a method of a struct
-func (cp *ChunkProcessor) ProcessChunks(responseChan <-chan string, bufferedChunkChan chan<- sse.Event) {
-	for chunk := range responseChan {
-		for _, char := range chunk {
-			if cp.isCodeBlock {
-				cp.processCodeBlockChar(char, bufferedChunkChan)
-			} else if cp.isCitation {
-				cp.processCitationChar(char, bufferedChunkChan)
-			} else {
-				cp.processTextChar(char, bufferedChunkChan)
+func (cp *ChunkProcessor) ProcessChunks(ctx context.Context, responseChan <-chan string, bufferedChunkChan chan<- sse.Event) {
+	for {
+		select {
+		case chunk, ok := <-responseChan:
+			if !ok {
+				cp.flushRemainingBuffers(bufferedChunkChan)
+				return
 			}
+			cp.processChunk(chunk, bufferedChunkChan)
+		case <-ctx.Done():
+			cp.flushRemainingBuffers(bufferedChunkChan)
+			return
 		}
-		cp.maybeFlushTextBufferTo(bufferedChunkChan)
 	}
+}
 
+func (cp *ChunkProcessor) flushRemainingBuffers(bufferedChunkChan chan<- sse.Event) {
 	if cp.codeBuffer.Len() > 0 {
 		bufferedChunkChan <- sse.NewCodeBlockEvent(cp.codeBuffer.String())
 	} else if cp.citationBuffer.Len() > 0 {
 		bufferedChunkChan <- sse.NewTextEvent(cp.citationBuffer.String())
 	}
-
 	close(bufferedChunkChan)
+}
+
+func (cp *ChunkProcessor) processChunk(chunk string, bufferedChunkChan chan<- sse.Event) {
+	for _, char := range chunk {
+		if cp.isCodeBlock {
+			cp.processCodeBlockChar(char, bufferedChunkChan)
+		} else if cp.isCitation {
+			cp.processCitationChar(char, bufferedChunkChan)
+		} else {
+			cp.processTextChar(char, bufferedChunkChan)
+		}
+	}
+	cp.maybeFlushTextBufferTo(bufferedChunkChan)
 }
 
 func (cp *ChunkProcessor) processCodeBlockChar(char rune, bufferedChunkChan chan<- sse.Event) {
