@@ -146,12 +146,13 @@ func (s *Server) writeChunksToStream(ctx context.Context, stream sse.Stream, pro
 		case chunk, ok := <-processedChunkChan:
 			if !ok {
 				stream.Write(sse.Event{EventType: "done", Data: "DONE"})
+				return
 			}
 			if err := stream.Write(chunk); err != nil {
 				//	Unsure how to handle Write errors for now
 			}
 		case <-ctx.Done():
-			stream.Write(sse.Event{EventType: "cancelled", Data: "Request cancelled"})
+			return
 		}
 	}
 }
