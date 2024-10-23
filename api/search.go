@@ -88,12 +88,12 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	answerer := generation.NewAnswerer(s.openAIClient)
 	shouldStream := true
 
-	responseChan := make(chan string, 1)
-	defer close(responseChan)
+	rawChunkChan := make(chan string, 1)
+	defer close(rawChunkChan)
 
 	prompt := fmt.Sprintf("<question>%s</question>", query)
 	go func() {
-		if err := answerer.Generate(ctx, prompt, documents, responseChan, shouldStream); err != nil {
+		if err := answerer.Generate(ctx, prompt, documents, rawChunkChan, shouldStream); err != nil {
 			cancel()
 			render.Render(w, r, InternalServerError(fmt.Sprintf("error generating answer: %v", err)))
 			return
@@ -102,7 +102,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	if !shouldStream {
 		select {
-		case text := <-responseChan:
+		case text := <-rawChunkChan:
 			render.JSON(w, r, SearchResponse{text})
 		case <-ctx.Done():
 			render.Render(w, r, InternalServerError("request cancelled"))
@@ -110,18 +110,17 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bufferedChunkChan := make(chan sse.Event, 1)
-	defer close(bufferedChunkChan)
+	processedChunkChan := make(chan sse.Event, 1)
 
 	chunkProcessor := ChunkProcessor{}
-	go chunkProcessor.ProcessChunks(ctx, responseChan, bufferedChunkChan)
+	go chunkProcessor.ProcessChunks(ctx, rawChunkChan, processedChunkChan)
 
-	if err := s.setupAndRunSSEStream(w, r, ctx, documents, bufferedChunkChan); err != nil {
+	if err := s.setupAndRunSSEStream(w, r, ctx, documents, processedChunkChan); err != nil {
 		render.Render(w, r, InternalServerError(fmt.Sprintf("error with SSE stream: %v", err)))
 	}
 }
 
-func (s *Server) setupAndRunSSEStream(w http.ResponseWriter, r *http.Request, ctx context.Context, documents []document.Document, bufferedChunkChan <-chan sse.Event) error {
+func (s *Server) setupAndRunSSEStream(w http.ResponseWriter, r *http.Request, ctx context.Context, documents []document.Document, processedChunkChan <-chan sse.Event) error {
 	stream := sse.NewStream(w)
 	if err := stream.Establish(); err != nil {
 		return fmt.Errorf("error establishing stream: %v", err)
@@ -134,7 +133,7 @@ func (s *Server) setupAndRunSSEStream(w http.ResponseWriter, r *http.Request, ct
 
 	for {
 		select {
-		case chunk, ok := <-bufferedChunkChan:
+		case chunk, ok := <-processedChunkChan:
 			if !ok {
 				return stream.Write(sse.Event{EventType: "done", Data: "DONE"})
 			}
