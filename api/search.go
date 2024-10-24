@@ -90,11 +90,6 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	rawChunkChan := make(chan string, 1)
 	processedChunkChan := make(chan sse.Event, 1)
 
-	defer func() {
-		close(rawChunkChan)
-		close(processedChunkChan)
-	}()
-
 	prompt := fmt.Sprintf("<question>%s</question>", query)
 	g.Go(func() error {
 		return answerer.Generate(gctx, prompt, documents, rawChunkChan, shouldStream)
