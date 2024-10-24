@@ -23,45 +23,46 @@ const (
 )
 
 // ProcessChunks should maybe be a standalone function instead of being a method of a struct
-func (cp *ChunkProcessor) ProcessChunks(ctx context.Context, responseChan <-chan string, bufferedChunkChan chan<- sse.Event) {
+func (cp *ChunkProcessor) ProcessChunks(ctx context.Context, responseChan <-chan string, processedEventChan chan<- sse.Event) {
 	for {
 		select {
 		case chunk, ok := <-responseChan:
 			if !ok {
-				cp.flushRemainingBuffers(bufferedChunkChan)
+				cp.flushRemainingBuffers(processedEventChan)
+				close(processedEventChan)
 				return
 			}
-			cp.processChunk(chunk, bufferedChunkChan)
+			cp.processChunk(chunk, processedEventChan)
 		case <-ctx.Done():
-			cp.flushRemainingBuffers(bufferedChunkChan)
+			cp.flushRemainingBuffers(processedEventChan)
+			close(processedEventChan)
 			return
 		}
 	}
 }
 
-func (cp *ChunkProcessor) flushRemainingBuffers(bufferedChunkChan chan<- sse.Event) {
+func (cp *ChunkProcessor) flushRemainingBuffers(processedEventChan chan<- sse.Event) {
 	if cp.codeBuffer.Len() > 0 {
-		bufferedChunkChan <- sse.NewCodeBlockEvent(cp.codeBuffer.String())
+		processedEventChan <- sse.NewCodeBlockEvent(cp.codeBuffer.String())
 	} else if cp.citationBuffer.Len() > 0 {
-		bufferedChunkChan <- sse.NewTextEvent(cp.citationBuffer.String())
+		processedEventChan <- sse.NewTextEvent(cp.citationBuffer.String())
 	}
-	close(bufferedChunkChan)
 }
 
-func (cp *ChunkProcessor) processChunk(chunk string, bufferedChunkChan chan<- sse.Event) {
+func (cp *ChunkProcessor) processChunk(chunk string, processedEventChan chan<- sse.Event) {
 	for _, char := range chunk {
 		if cp.isCodeBlock {
-			cp.processCodeBlockChar(char, bufferedChunkChan)
+			cp.processCodeBlockChar(char, processedEventChan)
 		} else if cp.isCitation {
-			cp.processCitationChar(char, bufferedChunkChan)
+			cp.processCitationChar(char, processedEventChan)
 		} else {
-			cp.processTextChar(char, bufferedChunkChan)
+			cp.processTextChar(char, processedEventChan)
 		}
 	}
-	cp.maybeFlushTextBufferTo(bufferedChunkChan)
+	cp.maybeFlushTextBufferTo(processedEventChan)
 }
 
-func (cp *ChunkProcessor) processCodeBlockChar(char rune, bufferedChunkChan chan<- sse.Event) {
+func (cp *ChunkProcessor) processCodeBlockChar(char rune, processedEventChan chan<- sse.Event) {
 	cp.codeBuffer.WriteRune(char)
 	if cp.codeBuffer.Len() < 4 {
 		if char != '`' {
@@ -70,8 +71,7 @@ func (cp *ChunkProcessor) processCodeBlockChar(char rune, bufferedChunkChan chan
 			cp.isCodeBlock = false
 		}
 	} else if strings.HasSuffix(cp.codeBuffer.String(), codeBlockMarker) {
-		fmt.Println(cp.codeBuffer.String())
-		bufferedChunkChan <- sse.NewCodeBlockEvent(cp.codeBuffer.String())
+		processedEventChan <- sse.NewCodeBlockEvent(cp.codeBuffer.String())
 		cp.codeBuffer.Reset()
 		cp.isCodeBlock = false
 	} else if !(strings.HasPrefix(codeBlockMarker, cp.codeBuffer.String()) || strings.HasPrefix(cp.codeBuffer.String(), codeBlockMarker)) {
@@ -81,10 +81,10 @@ func (cp *ChunkProcessor) processCodeBlockChar(char rune, bufferedChunkChan chan
 	}
 }
 
-func (cp *ChunkProcessor) processCitationChar(char rune, bufferedChunkChan chan<- sse.Event) {
+func (cp *ChunkProcessor) processCitationChar(char rune, processedEventChan chan<- sse.Event) {
 	cp.citationBuffer.WriteRune(char)
 	if strings.HasSuffix(cp.citationBuffer.String(), citationPostfixMarker) {
-		bufferedChunkChan <- createCitationEvent(cp.citationBuffer)
+		processedEventChan <- createCitationEvent(cp.citationBuffer)
 		cp.citationBuffer.Reset()
 		cp.isCitation = false
 	} else if !(strings.HasPrefix(citationPrefixMarker, cp.citationBuffer.String()) || strings.HasPrefix(cp.citationBuffer.String(), citationPrefixMarker)) {
@@ -106,13 +106,13 @@ func createCitationEvent(citationBuffer strings.Builder) sse.Event {
 	}
 }
 
-func (cp *ChunkProcessor) processTextChar(char rune, bufferedChunkChan chan<- sse.Event) {
+func (cp *ChunkProcessor) processTextChar(char rune, processedEventChan chan<- sse.Event) {
 	if char == '`' {
-		cp.maybeFlushTextBufferTo(bufferedChunkChan)
+		cp.maybeFlushTextBufferTo(processedEventChan)
 		cp.codeBuffer.WriteRune(char)
 		cp.isCodeBlock = true
 	} else if char == '<' {
-		cp.maybeFlushTextBufferTo(bufferedChunkChan)
+		cp.maybeFlushTextBufferTo(processedEventChan)
 		cp.citationBuffer.WriteRune(char)
 		cp.isCitation = true
 	} else {
@@ -120,9 +120,9 @@ func (cp *ChunkProcessor) processTextChar(char rune, bufferedChunkChan chan<- ss
 	}
 }
 
-func (cp *ChunkProcessor) maybeFlushTextBufferTo(bufferedChunkChan chan<- sse.Event) {
+func (cp *ChunkProcessor) maybeFlushTextBufferTo(processedEventChan chan<- sse.Event) {
 	if cp.textBuffer.Len() > 0 {
-		bufferedChunkChan <- sse.NewTextEvent(cp.textBuffer.String())
+		processedEventChan <- sse.NewTextEvent(cp.textBuffer.String())
 		cp.textBuffer.Reset()
 	}
 }

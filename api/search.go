@@ -26,7 +26,7 @@ type CitationChunk struct {
 	Value int    `json:"value"`
 }
 
-func (s *Server) validateAndExtractParams(r *http.Request) (query string, corpora []string, err error) {
+func validateAndExtractParams(r *http.Request) (query string, corpora []string, err error) {
 	queryParams := r.URL.Query()
 	query = queryParams.Get("q")
 	corpora = queryParams["corpus"]
@@ -64,7 +64,7 @@ func (s *Server) determineRetrievers(corpora []string) ([]retrieval.Retriever, e
 }
 
 func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
-	query, corpora, err := s.validateAndExtractParams(r)
+	query, corpora, err := validateAndExtractParams(r)
 	if err != nil {
 		render.Render(w, r, MalformedRequest(err.Error()))
 		return
@@ -88,7 +88,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	shouldStream := true
 
 	rawChunkChan := make(chan string, 1)
-	processedChunkChan := make(chan sse.Event, 1)
+	processedEventChan := make(chan sse.Event, 1)
 
 	prompt := fmt.Sprintf("<question>%s</question>", query)
 	g.Go(func() error {
@@ -111,7 +111,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	chunkProcessor := ChunkProcessor{}
 	g.Go(func() error {
-		chunkProcessor.ProcessChunks(gctx, rawChunkChan, processedChunkChan)
+		chunkProcessor.ProcessChunks(gctx, rawChunkChan, processedEventChan)
 		return nil
 	})
 
@@ -124,7 +124,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	stream.Write(documentsReference)
 
 	g.Go(func() error {
-		s.writeChunksToStream(gctx, stream, processedChunkChan)
+		s.writeEventsToStream(gctx, stream, processedEventChan)
 		return nil
 	})
 
@@ -135,10 +135,10 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) writeChunksToStream(ctx context.Context, stream sse.Stream, processedChunkChan <-chan sse.Event) {
+func (s *Server) writeEventsToStream(ctx context.Context, stream sse.Stream, processedEventChan <-chan sse.Event) {
 	for {
 		select {
-		case chunk, ok := <-processedChunkChan:
+		case chunk, ok := <-processedEventChan:
 			if !ok {
 				stream.Write(sse.Event{EventType: "done", Data: "DONE"})
 				return
