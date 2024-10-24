@@ -1,9 +1,8 @@
 package api
 
 import (
-	"encoding/json"
-	"fmt"
 	"github.com/go-chi/render"
+	"log/slog"
 	"net/http"
 )
 
@@ -57,6 +56,5 @@ func InternalServerError(details string) render.Renderer {
 
 // Log logs the full error details for internal use
 func (e *ErrResponse) Log() {
-	jsonError, _ := json.Marshal(e)
-	fmt.Println(jsonError)
+	slog.Error("error type HTTP response returned", "code", e.Code, "message", e.Message, "details", e.Details)
 }

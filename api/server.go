@@ -12,6 +12,7 @@ import (
 	"github.com/sashabaranov/go-openai"
 	"google.golang.org/grpc"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -50,6 +51,14 @@ func (s *Server) Start(ctx context.Context) {
 		Handler: s.router,
 	}
 
+	opts := &slog.HandlerOptions{
+		Level:     slog.LevelDebug,
+		AddSource: true,
+	}
+	handler := slog.NewTextHandler(os.Stdout, opts)
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
+
 	shutdownComplete := handleShutdown(func() {
 		if err := server.Shutdown(ctx); err != nil {
 			log.Printf("server.Shutdown failed: %v\n", err)
@@ -59,10 +68,10 @@ func (s *Server) Start(ctx context.Context) {
 	if err := server.ListenAndServe(); errors.Is(err, http.ErrServerClosed) {
 		<-shutdownComplete
 	} else {
-		log.Printf("http.ListenAndServe failed: %v\n", err)
+		slog.Error("http.ListenAndServe failed", "err", err)
 	}
 
-	log.Println("Shutdown gracefully")
+	slog.Info("Shutdown gracefully")
 }
 
 func handleShutdown(onShutdownSignal func()) <-chan struct{} {

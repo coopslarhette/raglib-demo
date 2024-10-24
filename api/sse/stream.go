@@ -42,16 +42,20 @@ func (s *Stream) Write(e Event) error {
 
 	// Note: technically might be misusing the id field on an SSE event here
 	if _, err := fmt.Fprintf(s.w, "event: %s\ndata: %s\nid: %s\n\n", e.EventType, marshalledData, e.ID); err != nil {
-		return fmt.Errorf("error writing to streaming: %v", err)
+		return fmt.Errorf("error writing to event stream: %v", err)
 	}
 
 	s.flusher.Flush()
 	return nil
 }
 
-func (s *Stream) Error(clientErrorMessage string) {
-	fmt.Fprintf(s.w, "event: error\ndata: %s\n\n", clientErrorMessage)
+func (s *Stream) Error(clientSafeErrorMessage string) error {
+	_, err := fmt.Fprintf(s.w, "event: error\ndata: %s\n\n", clientSafeErrorMessage)
+	if err != nil {
+		return fmt.Errorf("error occured when writing error message to event stream: %v", err)
+	}
 	s.flusher.Flush()
+	return nil
 }
 
 type Event struct {

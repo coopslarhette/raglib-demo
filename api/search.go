@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/go-chi/render"
 	"golang.org/x/sync/errgroup"
+	"log/slog"
 	"net/http"
 	"raglib/api/sse"
 	"raglib/lib/document"
@@ -82,7 +83,8 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	g, gctx := errgroup.WithContext(r.Context())
+	ctx := r.Context()
+	g, gctx := errgroup.WithContext(ctx)
 
 	answerer := generation.NewAnswerer(s.openAIClient)
 	shouldStream := true
@@ -104,7 +106,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			render.JSON(w, r, SearchResponse{text})
 		case <-gctx.Done():
-			render.Render(w, r, InternalServerError("request cancelled"))
+			render.Render(w, r, InternalServerError("context cancelled"))
 		}
 		return
 	}
@@ -118,10 +120,13 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	stream := sse.NewStream(w)
 	if err := stream.Establish(); err != nil {
 		render.Render(w, r, InternalServerError(fmt.Sprintf("error establishing stream: %v", err)))
+		return
 	}
 
 	documentsReference := sse.Event{EventType: "documentsreference", Data: documents}
-	stream.Write(documentsReference)
+	if err := stream.Write(documentsReference); err != nil {
+		slog.Error("error occurred writing documents reference to stream", "err", err)
+	}
 
 	g.Go(func() error {
 		s.writeEventsToStream(gctx, stream, processedEventChan)
@@ -129,8 +134,10 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err := g.Wait(); err != nil {
-		// TODO, figure out what we should do with this error
-		// especially if a Stream.Write error occurs
+		slog.Error("error occurred", "err", err)
+		if err := stream.Error("Internal server error occurred."); err != nil {
+			slog.Error("error occurred writing error to stream", "err", err)
+		}
 		return
 	}
 }
