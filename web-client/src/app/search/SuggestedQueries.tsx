@@ -9,7 +9,6 @@ type SuggestedQueriesProps = {
 const TO_SUGGEST = [
     'golang receiver methods',
     'van leeuwen ice cream founding date',
-    'hardly strictly saturday schedule 2024',
     'typescript partial type',
     'mt tam best hikes'
 ]
@@ -31,6 +30,7 @@ export default function SuggestedQueries({
                 <Button
                     onClick={(e) => handleClick(e, query)}
                     className={styles.button}
+                    key={query}
                 >
                     {query}
                 </Button>

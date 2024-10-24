@@ -65,9 +65,10 @@ export const useAnswerStream = (initialQuery: string) => {
                     dispatch({
                         type: 'ADD_ANSWER_CHUNK',
                         payload: {
-                            ...data,
                             type: eventType,
                             value: data,
+                            // Note: technically might be misusing lastEventId here according to Mozilla spec
+                            ID: event.lastEventId,
                         },
                     })
                     break

@@ -35,12 +35,13 @@ func (s *Stream) Establish() error {
 }
 
 func (s *Stream) Write(e Event) error {
-	marshalled, err := json.Marshal(e.Data)
+	marshalledData, err := json.Marshal(e.Data)
 	if err != nil {
 		return fmt.Errorf("error marshalling event data: %v", err)
 	}
 
-	if _, err := fmt.Fprintf(s.w, "event: %s\ndata: %s\n\n", e.EventType, marshalled); err != nil {
+	// Note: technically might be misusing the id field on an SSE event here
+	if _, err := fmt.Fprintf(s.w, "event: %s\ndata: %s\nid: %s\n\n", e.EventType, marshalledData, e.ID); err != nil {
 		return fmt.Errorf("error writing to streaming: %v", err)
 	}
 
