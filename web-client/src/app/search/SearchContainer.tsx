@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import SearchBar from './SearchBar'
-import { CircularProgress } from '@mui/material'
+import { CircularProgress, Tooltip } from '@mui/material'
 import { useAnswerStream } from '@/app/search/use-answer-stream'
 
 const SearchResults = dynamic(() => import('./SearchResults'), { ssr: false })
@@ -28,7 +28,9 @@ export default function SearchContainer({
         <>
             <SearchBar initialQuery={initialQuery} onSearch={handleSearch} />
             {isResponseLoading ? (
-                <CircularProgress style={{ color: 'var(--brand-teal)' }} />
+                <Tooltip title="Sorry, sometimes the backend has a cold start (free hosting).">
+                    <CircularProgress style={{ color: 'var(--brand-teal)' }} />
+                </Tooltip>
             ) : (
                 <SearchResults
                     documents={documents}
