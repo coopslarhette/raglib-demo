@@ -129,8 +129,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	g.Go(func() error {
-		s.writeEventsToStream(gctx, stream, processedEventChan)
-		return nil
+		return s.writeEventsToStream(gctx, stream, processedEventChan)
 	})
 
 	if err := g.Wait(); err != nil {
@@ -142,19 +141,25 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) writeEventsToStream(ctx context.Context, stream sse.Stream, processedEventChan <-chan sse.Event) {
+func (s *Server) writeEventsToStream(ctx context.Context, stream sse.Stream, processedEventChan <-chan sse.Event) error {
+	defer func() {
+		if err := stream.Write(sse.Event{EventType: "done", Data: "DONE"}); err != nil {
+			slog.Error("failed to write final done event", "err", err)
+		}
+	}()
+
 	for {
 		select {
 		case chunk, ok := <-processedEventChan:
 			if !ok {
-				stream.Write(sse.Event{EventType: "done", Data: "DONE"})
-				return
+				return nil
 			}
 			if err := stream.Write(chunk); err != nil {
-				//	Unsure how to handle Write errors for now
+				return fmt.Errorf("failed to write event to stream: %w", err)
 			}
 		case <-ctx.Done():
-			return
+			// Return reason context is done, or nil
+			return ctx.Err()
 		}
 	}
 }
