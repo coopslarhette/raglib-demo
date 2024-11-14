@@ -1,6 +1,6 @@
 import { AnswerChunk, ChunkType, SourceDocument } from '@/app/search/types'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useReducer, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { toSearchURL } from '@/api'
 
 interface AnswerStreamState {
@@ -43,6 +43,7 @@ export const useAnswerStream = (initialQuery: string) => {
             answerChunks: [],
         }
     )
+    const eventSourceRef = useRef<EventSource | null>(null)
 
     // Do this so we show loading spinner when navigating to a results page
     // and response is still loading
@@ -87,6 +88,14 @@ export const useAnswerStream = (initialQuery: string) => {
                 scroll: false,
             })
 
+            // Clean up existing event source if it exists, this prevents two sets of
+            // stream event listeners writing to the answerChunks/documents state at once
+            // This is a fix to the problem, however I'm not sure if it could be avoided entirely
+            // if I was more of an expert about using SSE streams with React/had a different arch
+            if (eventSourceRef.current !== null) {
+                eventSourceRef.current.close()
+                eventSourceRef.current = null
+            }
             setIsResponseLoading(true)
             dispatch({ type: 'RESET' })
 
@@ -118,7 +127,9 @@ export const useAnswerStream = (initialQuery: string) => {
             const eventSource = new EventSource(toSearchURL(query), {
                 withCredentials: true,
             })
-
+            // Save so the new event source object so it can be properly closed when a new
+            // handleSearch call comes in
+            eventSourceRef.current = eventSource
             ;(
                 [
                     'text',
