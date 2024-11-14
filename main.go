@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"github.com/joho/godotenv"
 	qdrant "github.com/qdrant/go-client/qdrant"
-	"github.com/sashabaranov/go-openai"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
-	"os"
 	"raglib/api"
 )
 
@@ -36,12 +34,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	config := openai.DefaultConfig(os.Getenv("GROQ_API_KEY"))
-	config.BaseURL = "https://api.groq.com/openai/v1"
-
-	openaiClient := openai.NewClientWithConfig(config)
-
-	server := api.NewServer(conn, openaiClient)
+	server := api.NewServer(conn)
 
 	server.Start(ctx)
 }

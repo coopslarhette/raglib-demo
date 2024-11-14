@@ -53,7 +53,7 @@ func (s *Server) determineRetrievers(corpora []string) ([]retrieval.Retriever, e
 
 	personalCollectionName := "text_collection"
 	var retrieversByCorpus = map[string]retrieval.Retriever{
-		"personal": retrieval.NewQdrantRetriever(s.qdrantPointsClient, s.openAIClient, personalCollectionName),
+		"personal": retrieval.NewQdrantRetriever(s.qdrantPointsClient, s.modelProvider.OpenAIClient, personalCollectionName),
 		"web":      webRetriever,
 	}
 
@@ -86,7 +86,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	g, gctx := errgroup.WithContext(ctx)
 
-	answerer := generation.NewAnswerer(s.openAIClient)
+	answerer := generation.NewAnswerer(s.modelProvider)
 	shouldStream := true
 
 	rawChunkChan := make(chan string, 1)

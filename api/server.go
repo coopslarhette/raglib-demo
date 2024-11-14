@@ -9,13 +9,13 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/go-chi/render"
 	qdrant "github.com/qdrant/go-client/qdrant"
-	"github.com/sashabaranov/go-openai"
 	"google.golang.org/grpc"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"raglib/lib/modelproviders"
 	"raglib/lib/retrieval/exa"
 	"raglib/lib/retrieval/serp"
 	"syscall"
@@ -26,16 +26,16 @@ type Server struct {
 	qdrantPointsClient qdrant.PointsClient
 	serpAPIClient      *serp.Client
 	exaAPIClient       *exa.Client
-	openAIClient       *openai.Client
+	modelProvider      *modelproviders.Facade
 }
 
-func NewServer(conn *grpc.ClientConn, openAIClient *openai.Client) *Server {
+func NewServer(conn *grpc.ClientConn) *Server {
 	s := &Server{
 		router:             chi.NewRouter(),
 		qdrantPointsClient: qdrant.NewPointsClient(conn),
 		serpAPIClient:      serp.NewClient(os.Getenv("SERPAPI_API_KEY"), http.DefaultClient),
 		exaAPIClient:       exa.NewClient(os.Getenv("EXA_API_KEY"), http.DefaultClient),
-		openAIClient:       openAIClient,
+		modelProvider:      modelproviders.NewFacade(os.Getenv("OPENAI_API_KEY"), os.Getenv("ANTHROPIC_API_KEY"), os.Getenv("GROQ_API_KEY")),
 	}
 
 	s.useMiddleWare()
@@ -65,6 +65,7 @@ func (s *Server) Start(ctx context.Context) {
 		}
 	})
 
+	slog.Info("Starting server...", "Address", server.Addr)
 	if err := server.ListenAndServe(); errors.Is(err, http.ErrServerClosed) {
 		<-shutdownComplete
 	} else {
@@ -97,7 +98,7 @@ func (s *Server) useMiddleWare() {
 	s.router.Use(middleware.Recoverer)
 
 	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000", "https://raglib.vercel.app"}, // Update with your frontend origin
+		AllowedOrigins:   []string{"http://localhost:3000", "https://raglib.vercel.app"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
