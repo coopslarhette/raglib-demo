@@ -21,7 +21,7 @@ export default function SearchPage({
                     <CircularProgress style={{ color: 'var(--brand-teal)' }} />
                 }
             >
-                <SearchContainer initialQuery={searchParams.q ?? ''} />
+                <SearchContainer initialQuery={searchParams.q} />
             </Suspense>
         </div>
     )
