@@ -12,7 +12,11 @@ interface AnswerChunkProps {
     setHoveredCitationIndex: React.Dispatch<React.SetStateAction<number | null>>
 }
 
-export default function AnswerSection({ ac, documents, setHoveredCitationIndex }: AnswerChunkProps) {
+export default function AnswerSection({
+    ac,
+    documents,
+    setHoveredCitationIndex,
+}: AnswerChunkProps) {
     const handleCitationClick = (citationIndex: number) => {
         const link = documents[citationIndex]?.webReference?.link
         if (!link) return
@@ -24,10 +28,11 @@ export default function AnswerSection({ ac, documents, setHoveredCitationIndex }
             return <span className={styles.answerText}>{ac.value}</span>
         case 'citation':
             return (
+                // Assumption is that citation number is already properly 1-indexed from backend
                 <CitationBubble
-                    onClick={() => handleCitationClick(ac.value)}
-                    label={ac.value + 1}
-                    onMouseEnter={() => setHoveredCitationIndex(ac.value)}
+                    citationNumber={ac.value}
+                    onClick={() => handleCitationClick(ac.value - 1)}
+                    onMouseEnter={() => setHoveredCitationIndex(ac.value - 1)}
                     onMouseLeave={() => setHoveredCitationIndex(null)}
                 />
             )

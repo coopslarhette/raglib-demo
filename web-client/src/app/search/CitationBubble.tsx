@@ -2,14 +2,14 @@ import React from 'react'
 import styles from './CitationBubble.module.css'
 
 type CitationProps = {
-    label: number
+    citationNumber: number
     onClick?: () => void
     onMouseEnter: () => void
     onMouseLeave: () => void
 }
 
 export function CitationBubble({
-    label,
+    citationNumber,
     onClick,
     onMouseEnter,
     onMouseLeave,
@@ -21,7 +21,7 @@ export function CitationBubble({
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
         >
-            {label}
+            {citationNumber}
         </span>
     )
 }
