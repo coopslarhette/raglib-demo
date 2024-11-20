@@ -17,7 +17,7 @@ export default function SearchHome() {
 
     return (
         <div className={styles.container}>
-            <h1 className={styles.title}>RAGLib Search</h1>
+            <h1 className={styles.title}>RAGLib Research</h1>
             <SearchBar onSearch={handleSubmit} />
             <SuggestedQueries onQueryClick={handleSubmit} />
         </div>

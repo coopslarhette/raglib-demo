@@ -15,7 +15,7 @@ export default function SearchPage({
 
     return (
         <div className={styles.root}>
-            <h2 className={styles.header}>RAGLib Search</h2>
+            <h2 className={styles.header}>RAGLib Research</h2>
             <Suspense
                 fallback={
                     <CircularProgress style={{ color: 'var(--brand-teal)' }} />
