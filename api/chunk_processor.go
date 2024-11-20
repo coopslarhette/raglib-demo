@@ -24,18 +24,19 @@ const (
 
 // ProcessChunks should maybe be a standalone function instead of being a method of a struct
 func (cp *ChunkProcessor) ProcessChunks(ctx context.Context, responseChan <-chan string, processedEventChan chan<- sse.Event) {
+	defer func() {
+		cp.flushRemainingBuffers(processedEventChan)
+		close(processedEventChan)
+	}()
+
 	for {
 		select {
 		case chunk, ok := <-responseChan:
 			if !ok {
-				cp.flushRemainingBuffers(processedEventChan)
-				close(processedEventChan)
 				return
 			}
 			cp.processChunk(chunk, processedEventChan)
 		case <-ctx.Done():
-			cp.flushRemainingBuffers(processedEventChan)
-			close(processedEventChan)
 			return
 		}
 	}
