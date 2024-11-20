@@ -2,7 +2,7 @@ package api
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"raglib/api/sse"
 	"strconv"
 	"strings"
@@ -84,7 +84,10 @@ func (cp *ChunkProcessor) processCodeBlockChar(char rune, processedEventChan cha
 func (cp *ChunkProcessor) processCitationChar(char rune, processedEventChan chan<- sse.Event) {
 	cp.citationBuffer.WriteRune(char)
 	if strings.HasSuffix(cp.citationBuffer.String(), citationPostfixMarker) {
-		processedEventChan <- createCitationEvent(cp.citationBuffer)
+		events := createCitationEvents(cp.citationBuffer)
+		for _, event := range events {
+			processedEventChan <- event
+		}
 		cp.citationBuffer.Reset()
 		cp.isCitation = false
 	} else if !(strings.HasPrefix(citationPrefixMarker, cp.citationBuffer.String()) || strings.HasPrefix(cp.citationBuffer.String(), citationPrefixMarker)) {
@@ -94,16 +97,26 @@ func (cp *ChunkProcessor) processCitationChar(char rune, processedEventChan chan
 	}
 }
 
-func createCitationEvent(citationBuffer strings.Builder) sse.Event {
+// createCitationEvents supports multiple citation numbers within a single citation location ie "... <cited>2,3</cited> ..."
+// but often it will just be returning a single citation event.
+func createCitationEvents(citationBuffer strings.Builder) []sse.Event {
 	citationStr := strings.TrimSuffix(citationBuffer.String(), citationPostfixMarker)
 	citationStr = strings.TrimPrefix(citationStr, citationPrefixMarker)
 	citationStr = strings.TrimSpace(citationStr)
-	if citationNumber, err := strconv.Atoi(citationStr); err != nil {
-		fmt.Printf("Invalid citation number text in between citation marker XML tags: %s\n", citationStr)
-		return sse.NewTextEvent(citationStr)
-	} else {
-		return sse.NewCitationEvent(citationNumber)
+
+	citations := strings.Split(citationStr, ",")
+	events := make([]sse.Event, 0, len(citations))
+
+	for _, citation := range citations {
+		citation = strings.TrimSpace(citation)
+		if citationNumber, err := strconv.Atoi(citation); err != nil {
+			slog.Error("can't parse citation number from citation string", "citation string", citation, "err", err)
+			events = append(events, sse.NewTextEvent(citation))
+		} else {
+			events = append(events, sse.NewCitationEvent(citationNumber))
+		}
 	}
+	return events
 }
 
 func (cp *ChunkProcessor) processTextChar(char rune, processedEventChan chan<- sse.Event) {
