@@ -11,6 +11,9 @@ import (
 	"raglib/lib/document"
 	"raglib/lib/generation"
 	"raglib/lib/retrieval"
+	"raglib/lib/retrieval/exa"
+	"raglib/lib/retrieval/qdrant"
+	"raglib/lib/retrieval/serp"
 )
 
 type SearchResponse struct {
@@ -46,14 +49,14 @@ func (s *Server) determineRetrievers(corpora []string) ([]retrieval.Retriever, e
 	var webRetriever retrieval.Retriever
 	// TODO: use google ranking and document content from Exa
 	if true {
-		webRetriever = retrieval.NewExaRetriever(s.exaAPIClient)
+		webRetriever = exa.NewRetriever(s.exaAPIClient)
 	} else {
-		webRetriever = retrieval.NewSERPRetriever(s.serpAPIClient)
+		webRetriever = serp.NewRetriever(s.serpAPIClient)
 	}
 
 	personalCollectionName := "text_collection"
 	var retrieversByCorpus = map[string]retrieval.Retriever{
-		"personal": retrieval.NewQdrantRetriever(s.qdrantPointsClient, s.modelProvider.OpenAIClient, personalCollectionName),
+		"personal": qdrant.NewRetriever(s.qdrantPointsClient, s.modelProvider.OpenAIClient, personalCollectionName),
 		"web":      webRetriever,
 	}
 
