@@ -4,7 +4,7 @@ import React from 'react'
 import styles from './AnswerSection.module.css'
 import { AnswerChunk, SourceDocument } from './types'
 import { CitationBubble } from './CitationBubble'
-import CodeBlock from '@/app/CodeBlock'
+import CodeBlock from '@/app/search/CodeBlock'
 
 interface AnswerChunkProps {
     ac: AnswerChunk
