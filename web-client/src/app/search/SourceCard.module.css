@@ -29,7 +29,15 @@
     gap: 4px;
     height: 100%;
     width: 100%;
-    padding: 16px 20px;
+    padding: 8px;
+    row-gap: 12px;
+}
+
+.cardTitle {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .position {
@@ -70,11 +78,14 @@
     margin-bottom: 8px;
 }
 
-.metadata {
+.metadataFooter {
     display: flex;
     flex-wrap: wrap;
     margin-top: auto;
     gap: 16px;
+}
+
+.metadata {
     color: #666;
     font-size: 14px;
 }

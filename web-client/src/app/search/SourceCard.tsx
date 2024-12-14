@@ -33,15 +33,10 @@ export function SourceCard({
                     [styles.hoveredViaCitation]: isHoveredViaCitation,
                 })}
             >
-                {thumbnail && (
-                    <CardMedia
-                        component="img"
-                        height="140"
-                        image={thumbnail}
-                        alt="Thumbnail"
-                    />
-                )}
                 <CardContent className={styles.cardContent}>
+                    <div className={styles.metadata}>
+                        <Typography>{displayedLink}</Typography>
+                    </div>
                     {favicon && (
                         <div className={styles.header}>
                             <img
@@ -51,10 +46,10 @@ export function SourceCard({
                             />
                         </div>
                     )}
-                    <Typography variant="subtitle1" component="div">
+                    <Typography className={styles.cardTitle} variant="subtitle1" component="div">
                         {title}
                     </Typography>
-                    <div className={styles.metadata}>
+                    <div className={clsx(styles.metadata, styles.metadataFooter)}>
                         {date && (
                             <Typography variant="body2">
                                 {dateToHumanReadable(date)}
