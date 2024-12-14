@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import SearchBar from './SearchBar'
 import { CircularProgress, Tooltip } from '@mui/material'
 import { useAnswerStream } from '@/app/search/use-answer-stream'
+import styles from './SearchContainer.module.css'
 
 const SearchResults = dynamic(() => import('./SearchResults'), { ssr: false })
 
@@ -25,7 +26,7 @@ export default function SearchContainer({
     }, [initialQuery])
 
     return (
-        <>
+        <div className={styles.root}>
             <SearchBar initialQuery={initialQuery} onSearch={handleSearch} />
             {isResponseLoading ? (
                 <Tooltip title="Sorry, sometimes the backend has a cold start (free hosting).">
@@ -37,6 +38,6 @@ export default function SearchContainer({
                     answerChunks={answerChunks}
                 />
             )}
-        </>
+        </div>
     )
 }

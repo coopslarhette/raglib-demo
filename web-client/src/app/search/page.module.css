@@ -3,6 +3,7 @@
     align-self: center;
     align-items: center;
     flex-direction: column;
+    min-width: 1000px;
     width: 1000px;
     height: 100%;
     padding: 70px 0;
