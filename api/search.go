@@ -45,28 +45,6 @@ func validateAndExtractParams(r *http.Request) (query string, corpora []string, 
 	return query, corpora, nil
 }
 
-func (s *Server) determineRetrievers(corpora []string) ([]retrieval.Retriever, error) {
-	var webRetriever retrieval.Retriever
-	// TODO: use google ranking and document content from Exa
-	if true {
-		webRetriever = exa.NewRetriever(s.exaAPIClient)
-	} else {
-		webRetriever = serp.NewRetriever(s.serpAPIClient)
-	}
-
-	personalCollectionName := "text_collection"
-	var retrieversByCorpus = map[string]retrieval.Retriever{
-		"personal": qdrant.NewRetriever(s.qdrantPointsClient, s.modelProvider.OpenAIClient, personalCollectionName),
-		"web":      webRetriever,
-	}
-
-	retrievers, err := corporaToRetrievers(corpora, retrieversByCorpus)
-	if err != nil {
-		return nil, err
-	}
-	return retrievers, nil
-}
-
 func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	query, corpora, err := validateAndExtractParams(r)
 	if err != nil {
@@ -74,19 +52,14 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	retrievers, err := s.determineRetrievers(corpora)
-	if err != nil {
-		render.Render(w, r, MalformedRequest(err.Error()))
-		return
-	}
-
-	documents, err := retrieveAllDocuments(r.Context(), query, retrievers)
-	if err != nil {
-		render.Render(w, r, InternalServerError(fmt.Sprintf("error retrieving documents: %v", err)))
-		return
-	}
-
 	ctx := r.Context()
+
+	documents, err := s.doRetrieval(ctx, corpora, query)
+	if err != nil {
+		render.Render(w, r, InternalServerError(err.Error()))
+		return
+	}
+
 	g, gctx := errgroup.WithContext(ctx)
 
 	answerer := generation.NewAnswerer(s.modelProvider)
@@ -142,6 +115,41 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+}
+
+func (s *Server) determineRetrievers(corpora []string) ([]retrieval.Retriever, error) {
+	var webRetriever retrieval.Retriever
+	// TODO: use google ranking and document content from Exa
+	if true {
+		webRetriever = exa.NewRetriever(s.exaAPIClient)
+	} else {
+		webRetriever = serp.NewRetriever(s.serpAPIClient)
+	}
+
+	personalCollectionName := "text_collection"
+	var retrieversByCorpus = map[string]retrieval.Retriever{
+		"personal": qdrant.NewRetriever(s.qdrantPointsClient, s.modelProvider.OpenAIClient, personalCollectionName),
+		"web":      webRetriever,
+	}
+
+	retrievers, err := corporaToRetrievers(corpora, retrieversByCorpus)
+	if err != nil {
+		return nil, err
+	}
+	return retrievers, nil
+}
+
+func (s *Server) doRetrieval(ctx context.Context, corpora []string, query string) ([]document.Document, error) {
+	retrievers, err := s.determineRetrievers(corpora)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine retrievers: %w", err)
+	}
+
+	documents, err := retrieveAllDocuments(ctx, query, retrievers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve documents: %w", err)
+	}
+	return documents, nil
 }
 
 func (s *Server) writeEventsToStream(ctx context.Context, stream sse.Stream, processedEventChan <-chan sse.Event) error {
