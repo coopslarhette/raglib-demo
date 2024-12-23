@@ -14,6 +14,7 @@ import (
 	"raglib/lib/retrieval/exa"
 	"raglib/lib/retrieval/qdrant"
 	"raglib/lib/retrieval/serp"
+	"sync"
 )
 
 type SearchResponse struct {
@@ -68,9 +69,8 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	rawChunkChan := make(chan string, 1)
 	processedEventChan := make(chan sse.Event, 1)
 
-	prompt := fmt.Sprintf("<question>%s</question>", query)
 	g.Go(func() error {
-		return answerer.Generate(gctx, prompt, documents, rawChunkChan, shouldStream)
+		return answerer.Generate(gctx, query, documents, rawChunkChan, shouldStream)
 	})
 
 	if !shouldStream {
@@ -117,28 +117,6 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) determineRetrievers(corpora []string) ([]retrieval.Retriever, error) {
-	var webRetriever retrieval.Retriever
-	// TODO: use google ranking and document content from Exa
-	if true {
-		webRetriever = exa.NewRetriever(s.exaAPIClient)
-	} else {
-		webRetriever = serp.NewRetriever(s.serpAPIClient)
-	}
-
-	personalCollectionName := "text_collection"
-	var retrieversByCorpus = map[string]retrieval.Retriever{
-		"personal": qdrant.NewRetriever(s.qdrantPointsClient, s.modelProvider.OpenAIClient, personalCollectionName),
-		"web":      webRetriever,
-	}
-
-	retrievers, err := corporaToRetrievers(corpora, retrieversByCorpus)
-	if err != nil {
-		return nil, err
-	}
-	return retrievers, nil
-}
-
 func (s *Server) doRetrieval(ctx context.Context, corpora []string, query string) ([]document.Document, error) {
 	retrievers, err := s.determineRetrievers(corpora)
 	if err != nil {
@@ -150,6 +128,39 @@ func (s *Server) doRetrieval(ctx context.Context, corpora []string, query string
 		return nil, fmt.Errorf("failed to retrieve documents: %w", err)
 	}
 	return documents, nil
+}
+
+func (s *Server) determineRetrievers(corpora []string) ([]retrieval.Retriever, error) {
+	personalCollectionName := "text_collection"
+	var retrieversByCorpus = map[string][]retrieval.Retriever{
+		"personal": {
+			qdrant.NewRetriever(s.qdrantPointsClient, s.modelProvider.OpenAIClient, personalCollectionName),
+		},
+		"web": {
+			exa.NewRetriever(s.exaAPIClient),
+			serp.NewRetriever(s.serpAPIClient),
+		},
+	}
+
+	retrievers, err := corporaToRetrievers(corpora, retrieversByCorpus)
+	if err != nil {
+		return nil, err
+	}
+	return retrievers, nil
+}
+
+func corporaToRetrievers(corporaSelection []string, retrieversByCorpus map[string][]retrieval.Retriever) ([]retrieval.Retriever, error) {
+	var retrievers []retrieval.Retriever
+
+	for _, corpus := range corporaSelection {
+		corpusRetrievers, ok := retrieversByCorpus[corpus]
+		if !ok {
+			return nil, fmt.Errorf("corpus, %v, is invalid", corpus)
+		}
+		retrievers = append(retrievers, corpusRetrievers...)
+	}
+
+	return retrievers, nil
 }
 
 func (s *Server) writeEventsToStream(ctx context.Context, stream sse.Stream, processedEventChan <-chan sse.Event) error {
@@ -175,30 +186,29 @@ func (s *Server) writeEventsToStream(ctx context.Context, stream sse.Stream, pro
 	}
 }
 
-func corporaToRetrievers(corporaSelection []string, retrieversByCorpus map[string]retrieval.Retriever) ([]retrieval.Retriever, error) {
-	retrievers := make([]retrieval.Retriever, len(corporaSelection))
-	for i, c := range corporaSelection {
-		retriever, ok := retrieversByCorpus[c]
-		if !ok {
-			return nil, fmt.Errorf("corpus, %v, is invalid", c)
-		}
-		retrievers[i] = retriever
-	}
-	return retrievers, nil
-}
-
 func retrieveAllDocuments(ctx context.Context, q string, retrievers []retrieval.Retriever) ([]document.Document, error) {
-	documents := make(chan []document.Document, len(retrievers))
+	var (
+		wg           errgroup.Group
+		mu           sync.Mutex
+		docsBySource = make(map[string][]document.Document)
+	)
 
-	var wg errgroup.Group
 	for _, r := range retrievers {
+		r := r // capture loop variable
 		wg.Go(func() error {
-			docs, err := r.Query(ctx, q, 5)
+			docs, err := r.Query(ctx, q, 20)
 			if err != nil {
 				return err
 			}
 
-			documents <- docs
+			if len(docs) == 0 {
+				return nil
+			}
+
+			mu.Lock()
+			docsBySource[docs[0].WebReference.APISource] = docs
+			mu.Unlock()
+
 			return nil
 		})
 	}
@@ -206,12 +216,51 @@ func retrieveAllDocuments(ctx context.Context, q string, retrievers []retrieval.
 	if err := wg.Wait(); err != nil {
 		return nil, fmt.Errorf("error while retrieving documents: %v", err)
 	}
-	close(documents)
 
-	var allDocs []document.Document
-	for docs := range documents {
-		allDocs = append(allDocs, docs...)
+	exaDocs, ok := docsBySource["exa"]
+	if !ok {
+		return nil, fmt.Errorf("no Exa documents found")
 	}
 
-	return allDocs, nil
+	exaDocsByURL := make(map[string]document.Document, len(exaDocs))
+	for _, d := range exaDocs {
+		exaDocsByURL[d.WebReference.Link] = d
+	}
+
+	serpDocs, ok := docsBySource["serp"]
+	if !ok {
+		return nil, fmt.Errorf("no SERP documents found")
+	}
+
+	seen := make(map[string]struct{})
+
+	// Return 6 documents because based of some YOLO intuition should contain sufficient amount / highly relevant content
+	// but not swamp the model with text, also 6 docs looks nicest in the UI
+	const documentCountToReturn = 6
+	ret := make([]document.Document, 0, documentCountToReturn)
+
+	for _, fromSerp := range serpDocs {
+		if len(ret) >= documentCountToReturn {
+			break
+		}
+		fromExa, exists := exaDocsByURL[fromSerp.WebReference.Link]
+		if !exists {
+			continue
+		}
+
+		seen[fromSerp.WebReference.Link] = struct{}{}
+		ret = append(ret, fromExa)
+	}
+
+	slog.Info("SERP / Exa response stats", "Number SERP results Exa has coverage for", len(ret), "Num SERP retrieved", len(serpDocs), "Num Exa retrieved", len(exaDocs))
+
+	for i := 0; len(ret) < documentCountToReturn && i < len(exaDocs); i++ {
+		fromExa := exaDocs[i]
+		if _, exists := seen[fromExa.WebReference.Link]; exists {
+			continue
+		}
+		ret = append(ret, fromExa)
+	}
+
+	return ret, nil
 }

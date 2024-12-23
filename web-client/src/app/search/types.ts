@@ -2,7 +2,7 @@ export type Passage = {
     text: string
 }
 
-export type Source = 'web' | 'personal'
+export type Corpus = 'web' | 'personal'
 
 export type WebReference = {
     title: string
@@ -17,7 +17,7 @@ export type WebReference = {
 
 export type SourceDocument = {
     passages: Passage[]
-    source: Source
+    corpus: Corpus
     webReference?: WebReference
 }
 
