@@ -8,6 +8,10 @@ type CitationProps = {
     onMouseLeave: () => void
 }
 
+/*
+ Only render the citation number as referencing a 1-indexed list when it is displayed.
+ Otherwise, it references a 0-indexed list throughout the system
+*/
 export function CitationBubble({
     citationNumber,
     onClick,
@@ -21,7 +25,7 @@ export function CitationBubble({
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
         >
-            {citationNumber}
+            {citationNumber + 1}
         </span>
     )
 }

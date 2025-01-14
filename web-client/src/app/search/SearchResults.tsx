@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import styles from './SearchResults.module.css'
 import { SourceDocument, AnswerChunk } from './types'
 import { SourceCard } from './SourceCard'
 import { Card, CardContent, CircularProgress } from '@mui/material'
-import AnswerSection from './AnswerSection'
+import { MarkdownRenderer } from '@/app/search/MarkdownRenderer'
 
 interface SearchResultsProps {
     documents: SourceDocument[]
@@ -19,6 +19,16 @@ export default function SearchResults({
     const [hoveredCitationIndex, setHoveredCitationIndex] = useState<
         null | number
     >(null)
+
+    // This is a bit of a hack for now, could def refactor things to not need this
+    const content = useMemo(() => {
+        return answerChunks.reduce((acc, chunk: AnswerChunk) => {
+            if (chunk.type === 'citation') {
+                return acc + `<cited>${chunk.value}</cited>`
+            }
+            return acc + chunk.value
+        }, '')
+    }, [answerChunks])
 
     return (
         <>
@@ -38,21 +48,12 @@ export default function SearchResults({
                     </div>
                 </div>
             )}
-            {answerChunks.length > 0 && (
+            {content.length > 0 && (
                 <div className={styles.resultSection}>
                     <h2 className={styles.headers}>Synthesis</h2>
                     <Card className={styles.answerCard}>
                         <CardContent className={styles.cardContent}>
-                            {answerChunks.map((ac) => (
-                                <AnswerSection
-                                    ac={ac}
-                                    setHoveredCitationIndex={
-                                        setHoveredCitationIndex
-                                    }
-                                    documents={documents}
-                                    key={ac.ID}
-                                />
-                            ))}
+                            <MarkdownRenderer content={content} setHoveredCitationIndex={setHoveredCitationIndex} />
                         </CardContent>
                     </Card>
                 </div>

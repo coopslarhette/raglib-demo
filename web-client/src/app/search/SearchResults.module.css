@@ -7,6 +7,11 @@
 
     .cardContent {
         border-radius: 12px;
+
+        /* Unset this property since it doubles up on the padding */
+        &:last-child {
+            padding-bottom: 0;
+        }
     }
 
     .answerCard {

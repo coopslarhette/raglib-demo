@@ -2,10 +2,10 @@
     display: inline-block;
     background-color: var(--brand-pink);
     color: var(--graphite-text);
-    border-radius: 4px;
-    padding: 2px 6px;
+    border-radius: 6px;
+    padding: 1.3px 6px;
     margin: 0 4px;
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
     transition: background-color 0.3s ease;
 }

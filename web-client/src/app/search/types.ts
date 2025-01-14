@@ -45,6 +45,7 @@ export type CodeBlockChunk = {
 
 export type CitationChunk = {
     type: 'citation'
+    // This number references a zero-indexed list of documents
     value: number
 }
 
