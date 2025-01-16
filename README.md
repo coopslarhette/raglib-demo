@@ -1,4 +1,4 @@
-# RAGLib Demo
+# `raglib` Demo
 
 A generative search application built to use [`raglib`](https://github.com/coopslarhette/raglib), featuring document retrieval to ground LLM-powered answer generation.
 
