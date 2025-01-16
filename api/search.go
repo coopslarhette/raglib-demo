@@ -234,11 +234,12 @@ func retrieveAllDocuments(ctx context.Context, q string, retrievers []retrieval.
 
 	seen := make(map[string]struct{})
 
-	// Return 6 documents because based of some YOLO intuition should contain sufficient amount / highly relevant content
+	// Return 6 documents because based of some YOLO intuition that it should contain sufficient amount / highly relevant content
 	// but not swamp the model with text, also 6 docs looks nicest in the UI
 	const documentCountToReturn = 6
 	ret := make([]document.Document, 0, documentCountToReturn)
 
+	// Take any docs ranked highly via SERP that we have full text coverage for first
 	for _, fromSerp := range serpDocs {
 		if len(ret) >= documentCountToReturn {
 			break
@@ -254,6 +255,7 @@ func retrieveAllDocuments(ctx context.Context, q string, retrievers []retrieval.
 
 	slog.Info("SERP / Exa response stats", "Number SERP results Exa has coverage for", len(ret), "Num SERP retrieved", len(serpDocs), "Num Exa retrieved", len(exaDocs))
 
+	// To back-fill result to 6 documents, use highest ranked Exa results
 	for i := 0; len(ret) < documentCountToReturn && i < len(exaDocs); i++ {
 		fromExa := exaDocs[i]
 		if _, exists := seen[fromExa.WebReference.Link]; exists {
