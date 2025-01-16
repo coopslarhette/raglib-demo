@@ -7,7 +7,7 @@ A generative search application built to use [`raglib`](https://github.com/coops
 - Multi-source document retrieval & ranking (web search via SERP API and Exa.ai,)
 - Rich answer formatting via Markdown support
 - Syntax highlighting
-- Proof of work via citations and source references
+- Proof of work via citations and source references embedded in Markdwon answer
 
 ## Architecture
 
