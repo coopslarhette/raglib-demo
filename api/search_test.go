@@ -1,7 +1,7 @@
 package api
 
 import (
-	"raglib/api/sse"
+	"raglib-demo/api/sse"
 	"testing"
 )
 

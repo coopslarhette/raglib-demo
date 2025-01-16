@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/coopslarhette/raglib/lib/modelproviders"
+	"github.com/coopslarhette/raglib/lib/retrieval/exa"
+	"github.com/coopslarhette/raglib/lib/retrieval/serp"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -15,9 +18,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"raglib/lib/modelproviders"
-	"raglib/lib/retrieval/exa"
-	"raglib/lib/retrieval/serp"
 	"syscall"
 )
 

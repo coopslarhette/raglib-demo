@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 	"log/slog"
-	"raglib/api/sse"
+	"raglib-demo/api/sse"
 	"strconv"
 	"strings"
 )
